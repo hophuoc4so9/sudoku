@@ -47,11 +47,33 @@ export const CodeSprintGame: React.FC<CodeSprintGameProps> = ({
   const [choices, setChoices] = useState<string[]>([]);
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
 
+  const [questionPool, setQuestionPool] = useState<CodeSprintQuestion[]>(CODE_SPRINT_QUESTIONS);
+  const questionPoolRef = React.useRef<CodeSprintQuestion[]>(CODE_SPRINT_QUESTIONS);
+
   const [isChecked, setIsChecked] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
   const [score, setScore] = useState(0);
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/api/code-questions')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
+        if (data?.questions && Array.isArray(data.questions) && data.questions.length > 0) {
+          questionPoolRef.current = data.questions;
+          setQuestionPool(data.questions);
+        }
+      })
+      .catch((err) => {
+        console.warn('Lỗi tải câu hỏi từ DB, dùng câu hỏi mặc định:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (screenState !== 'playing') return;
@@ -62,9 +84,10 @@ export const CodeSprintGame: React.FC<CodeSprintGameProps> = ({
   }, [screenState, startTime]);
 
   const nextRoundQuestion = (roundNum: number, currentUsedIds: number[]) => {
-    let candidates = CODE_SPRINT_QUESTIONS.filter((q) => !currentUsedIds.includes(q.id));
+    const pool = questionPoolRef.current.length > 0 ? questionPoolRef.current : CODE_SPRINT_QUESTIONS;
+    let candidates = pool.filter((q) => !currentUsedIds.includes(q.id));
     if (candidates.length === 0) {
-      candidates = [...CODE_SPRINT_QUESTIONS];
+      candidates = [...pool];
     }
     const q = candidates[Math.floor(Math.random() * candidates.length)];
     const newUsed = [...currentUsedIds, q.id];
@@ -72,13 +95,19 @@ export const CodeSprintGame: React.FC<CodeSprintGameProps> = ({
     setCurrentQuestion(q);
 
     const { slots } = parseQuestionSlots(q);
-    const chosenSlotIdx = Math.floor(Math.random() * slots.length);
-    const ans = slots[chosenSlotIdx];
+    const chosenSlotIdx = slots.length > 0 ? Math.floor(Math.random() * slots.length) : 0;
+    const ans = slots[chosenSlotIdx] || q.correctAnswer || '';
     setTargetSlotIndex(chosenSlotIdx);
-    setCorrectAnswer(ans);
 
-    const choiceList = generateDistractors(ans);
-    setChoices(choiceList);
+    if (q.correctAnswer && Array.isArray(q.options) && q.options.length > 0) {
+      setCorrectAnswer(q.correctAnswer);
+      setChoices([...q.options].sort(() => Math.random() - 0.5));
+    } else {
+      setCorrectAnswer(ans);
+      const choiceList = generateDistractors(ans);
+      setChoices(choiceList);
+    }
+
     setSelectedChoice(null);
     setIsChecked(false);
   };

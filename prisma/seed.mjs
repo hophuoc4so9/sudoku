@@ -1,14 +1,15 @@
-export interface CodeSprintQuestion {
-  id: number;
-  title: string;
-  topic: string;
-  description: string;
-  code: string;
-  options: string[];
-  correctAnswer: string;
-}
+import { PrismaClient } from '@prisma/client';
 
-export const CODE_SPRINT_QUESTIONS: CodeSprintQuestion[] = [
+const prisma = new PrismaClient();
+
+// Danh sách câu hỏi C++ mẫu với:
+// - title: Tiêu đề câu hỏi
+// - topic: Chủ đề kiến thức
+// - description: Yêu cầu đề bài
+// - code: Đoạn code C++ (chứa [[đáp án]] đánh dấu ô cần điền)
+// - correctAnswer: Đáp án đúng
+// - options: Danh sách 4 lựa chọn trắc nghiệm A, B, C, D
+export const QUESTIONS = [
   {
     id: 1,
     title: "In ra Xin chào thế giới",
@@ -191,59 +192,49 @@ export const CODE_SPRINT_QUESTIONS: CodeSprintQuestion[] = [
   }
 ];
 
-export function parseQuestionSlots(question: CodeSprintQuestion) {
-  const parts = question.code.split(/(\[\[.*?\]\])/g);
-  const slots: string[] = [];
-  const renderedParts: { text: string; isSlot: boolean; slotIndex?: number }[] = [];
+async function main() {
+  console.log('🌱 Bắt đầu nạp/cập nhật 20 câu hỏi C++ vào Neon PostgreSQL...');
+  let count = 0;
 
-  parts.forEach(part => {
-    if (part.startsWith('[[') && part.endsWith(']]')) {
-      const answer = part.slice(2, -2);
-      slots.push(answer);
-      renderedParts.push({ text: answer, isSlot: true, slotIndex: slots.length - 1 });
-    } else {
-      renderedParts.push({ text: part, isSlot: false });
-    }
+  for (const q of QUESTIONS) {
+    await prisma.codeQuestion.upsert({
+      where: { id: q.id },
+      update: {
+        title: q.title,
+        topic: q.topic,
+        description: q.description,
+        code: q.code,
+        correctAnswer: q.correctAnswer,
+        options: q.options,
+      },
+      create: {
+        id: q.id,
+        title: q.title,
+        topic: q.topic,
+        description: q.description,
+        code: q.code,
+        correctAnswer: q.correctAnswer,
+        options: q.options,
+      },
+    });
+    count++;
+  }
+
+  // Cập nhật sequence autoincrement của Postgres
+  try {
+    await prisma.$executeRawUnsafe(
+      `SELECT setval(pg_get_serial_sequence('"CodeQuestion"', 'id'), coalesce(max(id), 0) + 1, false) FROM "CodeQuestion";`
+    );
+  } catch (err) {}
+
+  console.log(`✅ Đã nạp thành công ${count} câu hỏi C++ với đáp án và 4 phương án trắc nghiệm!`);
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Lỗi khi seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
   });
-
-  return { slots, renderedParts };
-}
-
-export function generateDistractors(answer: string): string[] {
-  const groups = [
-    {
-      test: (v: string) => ["+", "-", "*", "/", "%", "<=", "!=", "+=", "*=", "/="].includes(v),
-      values: ["+", "-", "*", "/", "%", "<=", "!=", "+=", "*=", "/=", ">=", "=="]
-    },
-    {
-      test: (v: string) => /^\d+(?:\.\d+)?$/.test(v),
-      values: ["0", "1", "2", "3", "4", "5", "10", "20", "32", "60", "9.0", "3.0", "100"]
-    },
-    {
-      test: (v: string) => v.startsWith("Xin chao"),
-      values: ["Xin chao", "Xin chao the gioi", "Hello world", "Chao ban", "C++ Programming"]
-    },
-    {
-      test: (v: string) => ["i++", "i--"].includes(v),
-      values: ["i++", "i--", "++i", "--i", "i = 1", "i = n"]
-    },
-    {
-      test: (v: string) => v === "n",
-      values: ["n", "i", "0", "1", "10"]
-    },
-    {
-      test: (v: string) => v === "a + b + c",
-      values: ["a + b + c", "a * b * c", "(a + b) * c", "a + b - c"]
-    }
-  ];
-
-  const matched = groups.find(g => g.test(answer));
-  let pool = matched ? matched.values.filter(v => v !== answer) : ["0", "1", "x", "n"];
-
-  // Shuffle pool
-  pool = [...pool].sort(() => Math.random() - 0.5);
-
-  const selectedDistractors = pool.slice(0, 3);
-  const allChoices = [answer, ...selectedDistractors].sort(() => Math.random() - 0.5);
-  return allChoices;
-}

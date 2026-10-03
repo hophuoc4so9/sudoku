@@ -21,3 +21,14 @@ model Participant {
 
   @@index([gameType, isCorrect, durationInSeconds])
 }
+
+model CodeQuestion {
+  id            Int      @id @default(autoincrement())
+  title         String
+  topic         String
+  description   String
+  code          String   @db.Text
+  options       String[]
+  correctAnswer String   @default("")
+  createdAt     DateTime @default(now())
+}
