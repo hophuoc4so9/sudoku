@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Participant {
+  id                String   @id @default(uuid())
+  studentId         String   @unique
+  fullName          String
+  major             String   // CNTT, KTPM, TTNT
+  phone             String
+  durationInSeconds Int
+  isCorrect         Boolean  @default(false)
+  isGiftClaimed     Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  @@index([isCorrect, durationInSeconds])
+}
