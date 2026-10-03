@@ -120,10 +120,25 @@ export const Screen1Registration: React.FC<Screen1Props> = ({ onStart }) => {
         </button>
       </form>
 
-      {/* Luật chơi ngắn gọn */}
-      <div className="mt-5 rounded-2xl bg-brand-50 p-4 text-xs leading-relaxed text-brand-800">
-        <p className="mb-1 font-bold">📌 Luật chơi</p>
-        Điền số từ <b>1 đến 6</b> sao cho mỗi <b>hàng</b>, mỗi <b>cột</b> và mỗi <b>khối 2×3</b> đều không có số trùng nhau.
+      {/* Link sang mini-game Code Sprint */}
+      <div className="mt-4">
+        <a
+          href="/code-sprint"
+          className="flex items-center justify-between p-3.5 rounded-2xl bg-white border border-brand-200 hover:border-brand-400 shadow-sm transition group"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-brand-50 text-brand-700 text-sm font-black">&lt;/&gt;</span>
+            <div>
+              <p className="text-xs font-black text-brand-900 group-hover:text-brand-600 transition">
+                Thử Thách: Code Sprint C++
+              </p>
+              <p className="text-[11px] text-slate-500">Mini-game điền code C++ nhận quà CLB</p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-brand-600 flex items-center">
+            Chơi ngay →
+          </span>
+        </a>
       </div>
 
       <p className="mt-6 text-center text-[11px] text-slate-400">© CLB Sáng Tạo Số — TDMU</p>

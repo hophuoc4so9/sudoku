@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f5ef">
+  <title>Code Sprint — Điền chỗ trống C++</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #332d45;
+      --muted: #79748a;
+      --paper: #fff9f4;
+      --card: #fffefd;
+      --line: #eee6ef;
+      --green: #6657a8;
+      --green-dark: #514187;
+      --lime: #fff0a8;
+      --rainbow: linear-gradient(90deg, #ff9eae 0%, #ffc17f 16.6%, #ffe98a 33.2%, #a8df9d 49.8%, #8edbe1 66.4%, #aab5fa 83%, #e6a4d5 100%);
+      --code: #17231f;
+      --code-ink: #e8f0e9;
+      --coral: #d96f4c;
+      --shadow: 0 20px 55px rgba(32, 55, 43, .09);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% 15%, rgba(255, 190, 207, .32), transparent 22rem),
+        radial-gradient(circle at 93% 22%, rgba(179, 207, 255, .30), transparent 24rem),
+        radial-gradient(circle at 65% 95%, rgba(255, 231, 161, .28), transparent 27rem),
+        var(--paper);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    body::before { content: ""; position: fixed; z-index: 5; inset: 0 0 auto; height: 7px; background: var(--rainbow); }
+    button, input { font: inherit; }
+    .shell { width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding: 32px 0 54px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 48px; }
+    .brand { display: flex; align-items: center; gap: 11px; font-weight: 800; letter-spacing: -.04em; font-size: 19px; }
+    .brand-mark { display: grid; place-items: center; width: 40px; height: 40px; border: 3px solid white; border-radius: 14px; color: #fff; background: linear-gradient(145deg, #8674d1, #eb8fba); box-shadow: 0 5px 12px #b5a5d54a; font: 800 14px/1 ui-monospace, monospace; }
+    .local-pill { display: flex; align-items: center; gap: 8px; padding: 9px 13px; border: 1px solid #f0e3ef; border-radius: 999px; color: #6d6680; background: #fffdfb; font-size: 11px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; box-shadow: 0 4px 14px #7d66800b; }
+    .local-pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #7cce9e; box-shadow: 0 0 0 4px rgba(124,206,158,.17); }
+    .intro { position: relative; max-width: 690px; margin-bottom: 30px; }
+    .intro::after { content: "✦"; position: absolute; top: 34px; left: min(490px, 74vw); color: #f3bd51; font-size: 34px; transform: rotate(12deg); text-shadow: 13px 19px 0 #e8a2cb; }
+    .eyebrow { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 12px; padding: 7px 11px; border: 1px solid #f2e1ed; border-radius: 999px; color: #765b9f; background: #fffafd; font-size: 11px; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+    .eyebrow::before { content: "✿"; color: #ed90ab; font-size: 14px; }
+    h1 { max-width: 620px; margin: 0; color: #524775; background: var(--rainbow); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: clamp(39px, 6vw, 66px); line-height: .99; letter-spacing: -.065em; font-weight: 850; filter: drop-shadow(0 3px 0 #ffffffa8); }
+    .intro-copy { max-width: 590px; margin: 17px 0 0; color: var(--muted); font-size: 16px; line-height: 1.65; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 244px; align-items: start; gap: 20px; }
+    .game-card, .side-card { border: 1px solid rgba(235,224,236,.9); border-radius: 23px; background: var(--card); box-shadow: 0 20px 55px rgba(100, 75, 116, .09); }
+    .game-card { overflow: hidden; }
+    .card-top { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 21px 25px; border-bottom: 1px solid var(--line); background: linear-gradient(100deg, #fff9fb, #fffdf7 60%, #f9faff); }
+    .round-label { color: var(--muted); font-size: 13px; font-weight: 650; }
+    .round-label strong { color: var(--ink); }
+    .topic { padding: 7px 11px; border: 1px solid #e8def8; border-radius: 999px; color: #685497; background: #f5efff; font-size: 11px; font-weight: 800; }
+    .question { padding: 25px 25px 19px; }
+    .question h2 { margin: 0 0 8px; font-size: clamp(21px, 3vw, 27px); letter-spacing: -.04em; }
+    .question p { margin: 0; color: var(--muted); line-height: 1.6; font-size: 14px; }
+    .editor { margin: 0 25px; border: 1px solid #54486f; border-radius: 17px; overflow: hidden; background: var(--code); box-shadow: 0 10px 22px #493b641c; }
+    .editor-bar { display: flex; justify-content: space-between; align-items: center; padding: 11px 15px; color: #a5b3aa; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 11px; }
+    .dots { display: flex; gap: 5px; }
+    .dots i { width: 7px; height: 7px; border-radius: 50%; background: #52635a; }
+    .dots i:first-child { background: #db8062; }
+    .dots i:nth-child(2) { background: #e5bf61; }
+    .dots i:nth-child(3) { background: #75b789; }
+    pre { margin: 0; padding: 17px 16px 20px; color: var(--code-ink); overflow-x: auto; font: 13px/1.85 "Cascadia Code", Consolas, "SFMono-Regular", monospace; tab-size: 4; }
+    .blank {
+      display: inline-block; width: var(--blank-width, 12ch); min-width: 6ch; height: 1.65em; margin: 0 2px; padding: 0 5px;
+      vertical-align: -.27em; border: 1px solid #fff2a2; border-bottom: 3px solid #ffb3c2; border-radius: 8px;
+      outline: 0; color: #493c69; background: linear-gradient(135deg, #fff0a8, #ffd9e5); font: 750 12px/1.5 "Cascadia Code", Consolas, monospace;
+    }
+    .blank:focus { box-shadow: 0 0 0 4px rgba(225, 161, 209, .25); }
+    .help { padding: 11px 25px 0; color: #8b958e; font-size: 11px; }
+    .controls { display: flex; align-items: center; gap: 10px; padding: 20px 25px 22px; }
+    .btn { min-height: 44px; padding: 0 17px; border: 0; border-radius: 13px; cursor: pointer; font-size: 13px; font-weight: 800; transition: transform .15s, box-shadow .15s, background .15s; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { color: #493d63; background: var(--rainbow); box-shadow: 0 5px 13px #c995c42e; }
+    .btn-primary:hover { box-shadow: 0 8px 18px #c995c44a; }
+    .btn-secondary { color: #625a75; background: #f3eff9; }
+    .btn:disabled { opacity: .5; cursor: default; transform: none; }
+    .feedback { flex: 1; min-height: 20px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .feedback.good { color: #28774c; font-weight: 700; }
+    .feedback.bad { color: #b55a3c; }
+    .side-card { padding: 21px; }
+    .side-card + .side-card { margin-top: 14px; }
+    .side-title { margin: 0 0 16px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat { padding: 13px 11px; border-radius: 14px; background: #fff0f3; }
+    .stat:nth-child(2) { background: #eef1ff; }
+    .stat strong { display: block; font-size: 23px; letter-spacing: -.05em; }
+    .stat span { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .progress-head { display: flex; justify-content: space-between; margin-bottom: 9px; font-size: 12px; }
+    .progress-head span { color: var(--muted); }
+    .progress-track { height: 9px; overflow: hidden; border-radius: 99px; background: #f1edf5; }
+    .progress-fill { width: 0; height: 100%; border-radius: inherit; background: var(--rainbow); transition: width .25s; }
+    .tip { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; }
+    .tip b { color: var(--ink); }
+    .footnote { margin: 18px 4px 0; color: #89938c; font-size: 11px; line-height: 1.6; }
+    @media (max-width: 760px) {
+      .shell { width: min(100% - 26px, 580px); padding-top: 18px; }
+      .topbar { margin-bottom: 38px; }
+      .layout { grid-template-columns: 1fr; }
+      .side-rail { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .side-card + .side-card { margin-top: 0; }
+    }
+    @media (max-width: 520px) {
+      .local-pill { font-size: 10px; }
+      .question, .card-top { padding-left: 18px; padding-right: 18px; }
+      .editor { margin-left: 12px; margin-right: 12px; }
+      pre { padding-left: 12px; font-size: 11px; }
+      .help { padding-left: 18px; }
+      .controls { padding: 17px 18px 19px; flex-wrap: wrap; }
+      .feedback { order: 3; flex-basis: 100%; }
+      .side-rail { grid-template-columns: 1fr; }
+    }
+    /* Compact, distraction-free drag-and-drop game layout. */
+    .shell { width: min(1180px, calc(100% - 32px)); min-height: 100vh; padding: 16px 0 22px; display: flex; flex-direction: column; }
+    .topbar { margin: 0 0 14px; min-height: 42px; }
+    .brand { font-size: 16px; }
+    .brand-mark { width: 34px; height: 34px; border-radius: 12px; }
+    .local-pill { display: none; }
+    .intro, .help, .side-rail { display: none; }
+    .layout { flex: 1; display: block; }
+    .game-card { min-height: calc(100vh - 82px); display: flex; flex-direction: column; border-radius: 22px; }
+    .card-top { order: 0; padding: 13px 22px; }
+    .round-label { font-size: 12px; }
+    .question { padding: 17px 22px 14px; }
+    .question h2 { margin: 0 0 5px; font-size: clamp(21px, 3vw, 28px); }
+    .question p { font-size: 13px; }
+    .editor { flex: 1; min-height: 220px; max-height: calc(100vh - 390px); margin: 0 18px; display: flex; flex-direction: column; }
+    .editor-bar { flex: none; padding: 8px 13px; }
+    pre { flex: 1; padding: 12px 15px 16px; font-size: 13px; line-height: 1.72; }
+    .drop-slot { display: inline-flex; min-width: 92px; min-height: 29px; align-items: center; justify-content: center; margin: 0 3px; padding: 1px 9px; vertical-align: -.35em; border: 2px dashed #ef9dbd; border-radius: 9px; color: #493d63; background: #fff1b9; font: 750 12px/1.3 "Cascadia Code", Consolas, monospace; cursor: pointer; transition: .15s ease; }
+    .drop-slot.empty { color: #9d7590; background: #fff8fc; }
+    .drop-slot.drag-over { border-color: #765dc0; background: #e9ddff; transform: scale(1.04); }
+    .drop-slot.filled { border-style: solid; border-color: #a990dc; background: linear-gradient(120deg, #fff0b2, #f6d5ed); }
+    .drop-slot:focus-visible, .answer-tile:focus-visible { outline: 3px solid #8d7ad0; outline-offset: 3px; }
+    .answer-area { padding: 15px 22px 4px; }
+    .answer-heading { margin: 0 0 10px; color: #817a91; font-size: 12px; font-weight: 700; }
+    .answer-bank { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 47px; }
+    .answer-tile { min-height: 43px; padding: 0 15px; border: 1px solid #e3d7ef; border-bottom: 4px solid #cfbde4; border-radius: 13px; color: #4e4563; background: linear-gradient(145deg, #fff, #fff8fb); box-shadow: 0 3px 0 #f0e8f4; font: 750 13px/1.2 "Cascadia Code", Consolas, monospace; cursor: grab; touch-action: manipulation; transition: transform .14s, box-shadow .14s, opacity .14s; }
+    .answer-tile:hover, .answer-tile.selected { transform: translateY(-2px); border-color: #c8b5e4; background: linear-gradient(135deg, #fff4cc, #fbe0f1); box-shadow: 0 5px 0 #e7d5ed; }
+    .answer-tile:active { cursor: grabbing; transform: translateY(1px); }
+    .answer-tile.used { visibility: hidden; pointer-events: none; }
+    .controls { min-height: 66px; padding: 12px 22px 17px; }
+    .btn { min-height: 43px; }
+    .feedback { padding-left: 3px; }
+    .top-progress { display: flex; align-items: center; gap: 10px; color: #746c84; font-size: 12px; font-weight: 750; }
+    .progress-track { width: clamp(90px, 19vw, 190px); height: 8px; margin: 0; }
+    .feedback:empty { display: none; }
+    @media (max-width: 760px) {
+      .shell { width: calc(100% - 20px); padding-top: 11px; }
+      .topbar { margin-bottom: 9px; }
+      .game-card { min-height: calc(100vh - 65px); }
+      .editor { max-height: none; min-height: 210px; margin: 0 10px; }
+      pre { font-size: 11px; padding: 10px; }
+      .question, .card-top { padding-left: 15px; padding-right: 15px; }
+      .answer-area { padding: 13px 15px 3px; }
+      .controls { padding: 11px 15px 14px; }
+      .answer-bank { gap: 8px; }
+      .answer-tile { min-height: 40px; padding: 0 11px; font-size: 12px; }
+      .drop-slot { min-width: 78px; min-height: 27px; }
+    }
+    @media (max-height: 720px) and (min-width: 761px) {
+      .editor { max-height: calc(100vh - 335px); }
+      .question { padding-top: 12px; padding-bottom: 10px; }
+      .answer-area { padding-top: 9px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">&lt;/&gt;</span><span>Code Sprint</span></div>
+      <div class="top-progress"><span><b id="round">1</b> / 20</span><div class="progress-track"><div class="progress-fill" id="progress"></div></div></div>
+    </header>
+    <section class="layout" aria-label="Trò chơi">
+      <article class="game-card">
+        <div class="card-top"><div class="round-label" id="topic">C++</div></div>
+        <div class="question"><h2 id="title"></h2><p id="description"></p></div>
+        <div class="editor">
+          <div class="editor-bar"><span class="dots"><i></i><i></i><i></i></span><span>main.cpp</span><span>C++</span></div>
+          <pre id="code" aria-label="Kéo đáp án vào chỗ trống"></pre>
+        </div>
+        <div class="answer-area">
+          <p class="answer-heading">Kéo thẻ vào ô trống</p>
+          <div class="answer-bank" id="answer-bank" aria-label="Các đáp án"></div>
+        </div>
+        <div class="controls">
+          <button class="btn btn-primary" id="check">Kiểm tra</button>
+          <button class="btn btn-secondary" id="next" disabled>Tiếp tục →</button>
+          <div class="feedback" id="feedback" role="status" aria-live="polite"></div>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    // Nội dung và đáp án được biên soạn theo 20 bài trong tài liệu Word.
+    // [[đáp án]] đánh dấu các vị trí có thể được chọn ngẫu nhiên làm chỗ trống.
+    const questions = [
+      { title: "In ra Xin chào thế giới", topic: "Nhập xuất", description: "In dòng chữ “Xin chao the gioi” ra màn hình.", code: `#include <iostream>\n\nint main() {\n    std::cout << "[[Xin chao the gioi]]";\n    return [[0]];\n}` },
+      { title: "Tính tổng hai số có sẵn", topic: "Biến & phép tính", description: "Tính tổng a và b, sau đó in kết quả.", code: `#include <iostream>\n\nint main() {\n    int a = [[10]];\n    int b = 5;\n    int sum = a [[+]] b;\n    std::cout << "a + b = " << sum;\n    return 0;\n}` },
+      { title: "Chu vi và diện tích hình chữ nhật", topic: "Biến & phép tính", description: "Nhập chiều dài và chiều rộng là hai số nguyên dương.", code: `#include <iostream>\n\nint main() {\n    int dai;\n    std::cin >> dai;\n    int rong;\n    std::cin >> rong;\n    int chu_vi = (dai + rong) * [[2]];\n    int dien_tich = dai [[*]] rong;\n    std::cout << "Chu vi = " << chu_vi << "\\nDien tich = " << dien_tich;\n    return 0;\n}` },
+      { title: "Chu vi và diện tích hình vuông", topic: "Biến & phép tính", description: "Nhập độ dài cạnh là số nguyên dương.", code: `#include <iostream>\n\nint main() {\n    int canh;\n    std::cin >> canh;\n    std::cout << "Chu vi = " << canh * [[4]];\n    std::cout << "\\nDien tich = " << canh [[*]] canh;\n    return 0;\n}` },
+      { title: "Tính tổng và trung bình cộng", topic: "Biến & phép tính", description: "Nhập ba số nguyên a, b, c. In tổng và trung bình cộng.", code: `#include <iostream>\n\nint main() {\n    int a, b, c;\n    std::cin >> a >> b >> c;\n    int tong = [[a + b + c]];\n    double trung_binh = tong / [[3.0]];\n    std::cout << "Tong = " << tong;\n    std::cout << "\\nTrung binh = " << trung_binh;\n    return 0;\n}` },
+      { title: "Đổi độ C sang độ F", topic: "Biến & phép tính", description: "Dùng công thức F = C × 9 / 5 + 32.", code: `#include <iostream>\n\nint main() {\n    double c;\n    std::cin >> c;\n    double f = c * [[9.0]] / 5 + [[32]];\n    std::cout << "Nhiet do F = " << f;\n    return 0;\n}` },
+      { title: "Đổi phút thành giờ và phút", topic: "Chia lấy dư", description: "Ví dụ: 135 phút = 2 giờ 15 phút.", code: `#include <iostream>\n\nint main() {\n    int phut;\n    std::cin >> phut;\n    int gio = phut [[/]] 60;\n    int phut_le = phut % 60;\n    std::cout << gio << " gio " << phut_le << " phut";\n    return 0;\n}` },
+      { title: "In lời chào nhiều lần", topic: "Vòng lặp for", description: "Nhập n. Dùng for in “Xin chao” đúng n lần, mỗi lần một dòng.", code: `#include <iostream>\n\nint main() {\n    int n;\n    std::cin >> n;\n    for (int i = 1; i <= [[n]]; [[i++]]) {\n        std::cout << "Xin chao\\n";\n    }\n    return 0;\n}` },
+      { title: "In các số từ 1 đến n", topic: "Vòng lặp for", description: "Nhập số nguyên dương n, in các số cách nhau một dấu cách.", code: `#include <iostream>\n\nint main() {\n    int n;\n    std::cin >> n;\n    for (int i = [[1]]; i <= n; [[i++]]) {\n        std::cout << i << " ";\n    }\n    return 0;\n}` },
+      { title: "In các số từ n về 1", topic: "Vòng lặp for", description: "In các số theo thứ tự giảm dần từ n về 1.", code: `#include <iostream>\n\nint main() {\n    int n;\n    std::cin >> n;\n    for (int i = n; i >= [[1]]; [[i--]]) {\n        std::cout << i << " ";\n    }\n    return 0;\n}` },
+      { title: "In các số chẵn", topic: "Vòng lặp for", description: "In các số chẵn từ 0 đến n. Mỗi bước tăng i thêm 2.", code: `#include <iostream>\n\nint main() {\n    int n;\n    std::cin >> n;\n    for (int i = 0; i <= n; i [[+=]] 2) {\n        std::cout << i << " ";\n    }\n    return 0;\n}` },
+      { title: "Tính tổng từ 1 đến n", topic: "Vòng lặp for", description: "Dùng for tính tổng 1 + 2 + ... + n.", code: `#include <iostream>\n\nint main() {\n    int n;\n    std::cin >> n;\n    long long sum = [[0]];\n    for (int i = 1; i <= n; i++) {\n        sum [[+=]] i;\n    }\n    std::cout << "Tong = " << sum;\n    return 0;\n}` },
+      { title: "In bảng cửu chương", topic: "Vòng lặp for", description: "Nhập n và in bảng cửu chương từ nhân 1 đến nhân 10.", code: `#include <iostream>\n\nint main() {\n    int n;\n    std::cin >> n;\n    for (int i = [[1]]; i <= [[10]]; i++) {\n        std::cout << n << " x " << i << " = " << n * i << "\\n";\n    }\n    return 0;\n}` },
+      { title: "Tính giai thừa", topic: "Vòng lặp for", description: "Tính n! = 1 × 2 × ... × n với n từ 1 đến 20.", code: `#include <iostream>\n\nint main() {\n    int n;\n    std::cin >> n;\n    long long giai_thua = [[1]];\n    for (int i = 1; i <= n; i++) {\n        giai_thua [[*=]] i;\n    }\n    std::cout << "Giai thua = " << giai_thua;\n    return 0;\n}` },
+      { title: "Tính tổng các số được nhập", topic: "Vòng lặp for", description: "Nhập n rồi nhập tiếp n số nguyên. Không dùng mảng.", code: `#include <iostream>\n\nint main() {\n    int n;\n    std::cin >> n;\n    long long tong = [[0]];\n    for (int i = 1; i <= n; i++) {\n        int x;\n        std::cin >> x;\n        tong [[+=]] x;\n    }\n    std::cout << "Tong = " << tong;\n    return 0;\n}` },
+      { title: "In dãy số bằng while", topic: "Vòng lặp while", description: "Dùng while in các số từ 1 đến n.", code: `#include <iostream>\n\nint main() {\n    int n;\n    std::cin >> n;\n    int i = [[1]];\n    while (i <= n) {\n        std::cout << i << " ";\n        [[i++]];\n    }\n    return 0;\n}` },
+      { title: "Đếm chữ số", topic: "Vòng lặp while", description: "Đếm số chữ số của số nguyên dương n.", code: `#include <iostream>\n\nint main() {\n    int n;\n    std::cin >> n;\n    int dem = 0;\n    while (n > [[0]]) {\n        dem++;\n        n [[/=]] 10;\n    }\n    std::cout << "So chu so = " << dem;\n    return 0;\n}` },
+      { title: "Tính tổng các chữ số", topic: "Vòng lặp while", description: "Ví dụ: số 123 có tổng chữ số là 6.", code: `#include <iostream>\n\nint main() {\n    int n;\n    std::cin >> n;\n    int tong = 0;\n    while (n > 0) {\n        tong += n [[%]] 10;\n        n /= 10;\n    }\n    std::cout << "Tong chu so = " << tong;\n    return 0;\n}` },
+      { title: "Nhập đến khi có số dương", topic: "Vòng lặp do...while", description: "Nếu số vừa nhập không dương thì yêu cầu nhập lại.", code: `#include <iostream>\n\nint main() {\n    int n;\n    do {\n        std::cout << "Nhap so nguyen duong: ";\n        std::cin >> n;\n    } while (n [[<=]] 0);\n    std::cout << "So da nhap = " << n;\n    return 0;\n}` },
+      { title: "Nhập số 0 để kết thúc", topic: "Vòng lặp do...while", description: "Nhập liên tiếp các số nguyên, dừng khi nhập 0 và in tổng.", code: `#include <iostream>\n\nint main() {\n    int x;\n    long long tong = 0;\n    do {\n        std::cin >> x;\n        tong [[+=]] x;\n    } while (x [[!=]] 0);\n    std::cout << "Tong = " << tong;\n    return 0;\n}` }
+    ];
+
+    const el = id => document.getElementById(id);
+    let active = null;
+    let answered = false;
+    let seen = new Set();
+    let activeChoices = [];
+    let selectedChoice = null;
+    let activeSlot = null;
+
+    function persist() {
+      el("progress").style.width = `${Math.min(100, seen.size / questions.length * 100)}%`;
+    }
+
+    function chooseQuestion() {
+      if (seen.size === questions.length) seen.clear();
+      const candidates = questions.map((q, i) => i).filter(i => !seen.has(i));
+      const index = candidates[Math.floor(Math.random() * candidates.length)];
+      seen.add(index);
+      return questions[index];
+    }
+
+    function optionSet(answer) {
+      const groups = [
+        { test: value => ["+", "-", "*", "/", "%", "<=", "!=", "+=", "*=", "/="].includes(value), values: ["+", "-", "*", "/", "%", "<=", "!=", "+=", "*=", "/="] },
+        { test: value => /^\d+(?:\.\d+)?$/.test(value), values: ["0", "1", "2", "3", "4", "5", "10", "20", "32", "60", "9.0", "3.0"] },
+        { test: value => value.startsWith("Xin chao"), values: ["Xin chao", "Xin chao the gioi", "Hello world", "Chao ban"] },
+        { test: value => value.includes(" "), values: ["a + b", "a + b + c", "dai * rong", "canh * canh", "n * i", "phut % 60", "tong / 3"] },
+        { test: value => /^[A-Za-z_]\w*$/.test(value), values: ["n", "i", "sum", "tong", "phut", "gio", "dai", "rong"] }
+      ];
+      const group = groups.find(item => item.test(answer));
+      const pool = (group?.values || ["i++", "i--", "n + 1", "tong += x"]).filter(value => value !== answer);
+      const distractors = [...new Set(pool)].sort(() => Math.random() - 0.5).slice(0, 3);
+      const choices = [{ id: "correct", value: answer }, ...distractors.map((value, index) => ({ id: `wrong-${index}`, value }))];
+      return choices.sort(() => Math.random() - 0.5);
+    }
+
+    function syncChoices() {
+      document.querySelectorAll(".answer-tile").forEach(tile => {
+        tile.classList.toggle("used", tile.dataset.choiceId === active?.placedChoiceId);
+        tile.classList.toggle("selected", tile.dataset.choiceId === selectedChoice?.id);
+        tile.disabled = answered;
+      });
+    }
+
+    function placeChoice(choice) {
+      if (!choice || answered || !activeSlot) return;
+      active.placedChoiceId = choice.id;
+      activeSlot.dataset.value = choice.value;
+      activeSlot.textContent = choice.value;
+      activeSlot.classList.remove("empty");
+      activeSlot.classList.add("filled");
+      selectedChoice = null;
+      syncChoices();
+    }
+
+    function clearSlot() {
+      if (answered || !activeSlot) return;
+      delete active.placedChoiceId;
+      delete activeSlot.dataset.value;
+      activeSlot.textContent = "…";
+      activeSlot.classList.remove("filled");
+      activeSlot.classList.add("empty");
+      syncChoices();
+    }
+
+    function renderBank() {
+      const bank = el("answer-bank");
+      bank.replaceChildren();
+      activeChoices.forEach(choice => {
+        const tile = document.createElement("button");
+        tile.type = "button";
+        tile.className = "answer-tile";
+        tile.textContent = choice.value;
+        tile.draggable = true;
+        tile.dataset.choiceId = choice.id;
+        tile.addEventListener("click", () => {
+          if (answered || choice.id === active.placedChoiceId) return;
+          selectedChoice = selectedChoice?.id === choice.id ? null : choice;
+          syncChoices();
+        });
+        tile.addEventListener("dragstart", event => {
+          event.dataTransfer.setData("text/plain", choice.id);
+          event.dataTransfer.effectAllowed = "move";
+          selectedChoice = choice;
+          syncChoices();
+        });
+        tile.addEventListener("dragend", () => syncChoices());
+        bank.append(tile);
+      });
+      syncChoices();
+    }
+
+    function renderCode(question, blankIndex) {
+      const code = el("code");
+      code.replaceChildren();
+      activeSlot = null;
+      const matches = [...question.code.matchAll(/\[\[([\s\S]*?)\]\]/g)];
+      let cursor = 0;
+      matches.forEach((match, index) => {
+        code.append(document.createTextNode(question.code.slice(cursor, match.index)));
+        if (index === blankIndex) {
+          const slot = document.createElement("button");
+          slot.type = "button";
+          slot.className = "drop-slot empty";
+          slot.textContent = "…";
+          slot.setAttribute("aria-label", "Chỗ trống trong code. Chọn đáp án rồi chạm vào đây, hoặc kéo đáp án vào đây.");
+          slot.addEventListener("click", () => {
+            if (selectedChoice) placeChoice(selectedChoice);
+            else if (slot.dataset.value) clearSlot();
+          });
+          slot.addEventListener("dragover", event => {
+            if (answered) return;
+            event.preventDefault();
+            slot.classList.add("drag-over");
+          });
+          slot.addEventListener("dragleave", () => slot.classList.remove("drag-over"));
+          slot.addEventListener("drop", event => {
+            event.preventDefault();
+            slot.classList.remove("drag-over");
+            const choice = activeChoices.find(item => item.id === event.dataTransfer.getData("text/plain"));
+            placeChoice(choice);
+          });
+          activeSlot = slot;
+          code.append(slot);
+        } else {
+          code.append(document.createTextNode(match[1]));
+        }
+        cursor = match.index + match[0].length;
+      });
+      code.append(document.createTextNode(question.code.slice(cursor)));
+      renderBank();
+    }
+
+    function nextQuestion() {
+      active = chooseQuestion();
+      const slots = [...active.code.matchAll(/\[\[([\s\S]*?)\]\]/g)];
+      const blankIndex = Math.floor(Math.random() * slots.length);
+      active.answer = slots[blankIndex][1];
+      active.placedChoiceId = null;
+      selectedChoice = null;
+      activeChoices = optionSet(active.answer);
+      answered = false;
+      el("title").textContent = active.title;
+      el("description").textContent = active.description;
+      el("topic").textContent = active.topic;
+      el("round").textContent = seen.size;
+      el("feedback").textContent = "";
+      el("feedback").className = "feedback";
+      el("check").disabled = false;
+      el("next").disabled = true;
+      renderCode(active, blankIndex);
+      persist();
+    }
+
+    function normalize(value) { return value.trim().replace(/\s+/g, " "); }
+
+    function checkAnswer() {
+      if (answered) return;
+      const feedback = el("feedback");
+      if (!activeSlot?.dataset.value) {
+        feedback.textContent = "Chọn một đáp án trước nhé.";
+        feedback.className = "feedback bad";
+        return;
+      }
+      const isCorrect = normalize(activeSlot.dataset.value) === normalize(active.answer);
+      answered = true;
+      if (isCorrect) {
+        feedback.textContent = "Chính xác! Bạn đã hoàn thành chỗ trống.";
+        feedback.className = "feedback good";
+      } else {
+        feedback.textContent = `Chưa đúng. Đáp án là: ${active.answer}`;
+        feedback.className = "feedback bad";
+      }
+      activeSlot.disabled = true;
+      syncChoices();
+      el("check").disabled = true;
+      el("next").disabled = false;
+      el("next").focus();
+    }
+
+    el("check").addEventListener("click", checkAnswer);
+    el("answer-bank").addEventListener("keydown", event => {
+      if (event.key === "Enter" && selectedChoice && activeSlot) placeChoice(selectedChoice);
+    });
+    el("next").addEventListener("click", nextQuestion);
+    persist();
+    nextQuestion();
+  </script>
+</body>
+</html>
