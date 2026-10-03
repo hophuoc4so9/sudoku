@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Delete, RotateCcw, Send, Timer } from 'lucide-react';
-import { INITIAL_PUZZLE } from '@/lib/sudoku';
+import { ArrowLeft, Delete, RotateCcw, Send, Timer, Lightbulb, Sparkles } from 'lucide-react';
 import type { ParticipantInfo } from './Screen1Registration';
 
 type Cell = [number, number];
 
 interface Screen2Props {
   participantInfo: ParticipantInfo;
+  initialPuzzle: number[][];
+  solution: number[][];
   startTime: number;
   onSubmit: (finalBoard: number[][]) => void;
   onBack: () => void;
@@ -30,7 +31,6 @@ const ALL_GROUPS = [...ROWS, ...COLS, ...BLOCKS];
 
 const k = (r: number, c: number) => `${r}-${c}`;
 const blockIndex = (r: number, c: number) => Math.floor(r / 2) * 2 + Math.floor(c / 3);
-const isFixed = (r: number, c: number) => INITIAL_PUZZLE[r][c] !== 0;
 
 /** Trả về tập các ô đang bị trùng số (cùng hàng / cột / khối). */
 function findConflicts(board: number[][]): Set<string> {
@@ -67,18 +67,31 @@ const formatTime = (s: number) =>
 
 export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
   participantInfo,
+  initialPuzzle,
+  solution,
   startTime,
   onSubmit,
   onBack,
   isSubmitting,
 }) => {
-  const [board, setBoard] = useState<number[][]>(() => INITIAL_PUZZLE.map((row) => [...row]));
+  // Trạng thái bàn cờ khởi tạo từ đề ngẫu nhiên
+  const [board, setBoard] = useState<number[][]>(() => initialPuzzle.map((row) => [...row]));
   const [selected, setSelected] = useState<Cell | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
   const [flashId, setFlashId] = useState(0);
   const [shakeCell, setShakeCell] = useState<{ key: string; id: number } | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Số lượt gợi ý còn lại (tối đa 3 lượt)
+  const [hintsRemaining, setHintsRemaining] = useState<number>(3);
+  // Gợi ý tin nhắn nhỏ thông báo cho thí sinh
+  const [hintMessage, setHintMessage] = useState<string | null>(null);
+
+  const isFixed = useCallback(
+    (r: number, c: number) => initialPuzzle[r][c] !== 0,
+    [initialPuzzle]
+  );
 
   // Đồng hồ đếm giây
   useEffect(() => {
@@ -105,7 +118,8 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
       if (!selected) return;
       const [r, c] = selected;
       if (isFixed(r, c) || board[r][c] === value) return;
-      // Số đã điền đủ 6 lần -> không cho điền thêm
+
+      // Số đã điền đủ 6 lần trên bảng -> chặn không cho điền thêm
       if (value !== 0 && numberCounts[value] >= 6) return;
 
       const next = board.map((row) => [...row]);
@@ -129,10 +143,67 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
         flashTimer.current = setTimeout(() => setFlashCells(new Set()), 950);
       }
     },
-    [board, selected, numberCounts]
+    [board, selected, numberCounts, isFixed]
   );
 
-  // Hỗ trợ bàn phím vật lý (laptop)
+  // XỬ LÝ 3 LƯỢT GỢI Ý (HINT)
+  const handleUseHint = () => {
+    if (hintsRemaining <= 0) return;
+
+    let targetR = -1;
+    let targetC = -1;
+
+    // 1. Ưu tiên: nếu người dùng đang chọn 1 ô (không phải ô gốc và chưa điền đúng)
+    if (selected) {
+      const [sr, sc] = selected;
+      if (!isFixed(sr, sc) && board[sr][sc] !== solution[sr][sc]) {
+        targetR = sr;
+        targetC = sc;
+      }
+    }
+
+    // 2. Nếu không chọn ô nào hoặc ô đang chọn đã đúng -> tìm các ô trống / ô điền sai để gợi ý ngẫu nhiên
+    if (targetR === -1) {
+      const candidateCells: Cell[] = [];
+      for (let r = 0; r < 6; r++) {
+        for (let c = 0; c < 6; c++) {
+          if (!isFixed(r, c) && board[r][c] !== solution[r][c]) {
+            candidateCells.push([r, c]);
+          }
+        }
+      }
+
+      if (candidateCells.length === 0) {
+        setHintMessage('Tất cả các ô hiện tại đều đã chính xác!');
+        setTimeout(() => setHintMessage(null), 2500);
+        return;
+      }
+
+      // Chọn ngẫu nhiên 1 ô trong số các ô chưa đúng
+      const randomCell = candidateCells[Math.floor(Math.random() * candidateCells.length)];
+      targetR = randomCell[0];
+      targetC = randomCell[1];
+    }
+
+    const correctNumber = solution[targetR][targetC];
+
+    // Điền số chính xác vào ô đó
+    const nextBoard = board.map((row) => [...row]);
+    nextBoard[targetR][targetC] = correctNumber;
+    setBoard(nextBoard);
+    setSelected([targetR, targetC]);
+    setHintsRemaining((prev) => prev - 1);
+
+    // Hiệu ứng nháy xanh ô được gợi ý
+    setFlashCells(new Set([k(targetR, targetC)]));
+    setFlashId((id) => id + 1);
+    flashTimer.current = setTimeout(() => setFlashCells(new Set()), 1200);
+
+    setHintMessage(`Đã điền số ${correctNumber} vào hàng ${targetR + 1}, cột ${targetC + 1}!`);
+    setTimeout(() => setHintMessage(null), 3000);
+  };
+
+  // Hỗ trợ bàn phím vật lý
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const n = Number(e.key);
@@ -158,8 +229,8 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
   }, [writeCell]);
 
   const handleReset = () => {
-    if (confirm('Xóa toàn bộ các số đã điền và làm lại?')) {
-      setBoard(INITIAL_PUZZLE.map((row) => [...row]));
+    if (confirm('Xóa toàn bộ các số đã điền và làm lại từ đầu?')) {
+      setBoard(initialPuzzle.map((row) => [...row]));
       setSelected(null);
     }
   };
@@ -174,18 +245,15 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
     const sameNum = v !== 0 && v === selectedValue;
     const conflict = conflicts.has(key);
 
-    // Nền
     let bg = fixed ? 'bg-slate-100' : 'bg-white';
     if (related) bg = fixed ? 'bg-brand-100/70' : 'bg-brand-50';
     if (sameNum) bg = 'bg-brand-200/80';
     if (conflict) bg = 'bg-red-50';
     if (isSel) bg = conflict ? 'bg-red-100' : 'bg-brand-200';
 
-    // Chữ
     let text = fixed ? 'text-brand-900 font-black' : 'text-brand-600 font-bold';
     if (conflict) text = 'text-red-600 font-black';
 
-    // Viền: đậm giữa các khối 2x3
     const borderR = c === 5 ? '' : c === 2 ? 'border-r-2 border-r-brand-700' : 'border-r border-r-brand-100';
     const borderB = r === 5 ? '' : r === 1 || r === 3 ? 'border-b-2 border-b-brand-700' : 'border-b border-b-brand-100';
 
@@ -197,8 +265,8 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
 
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-2rem)] w-full max-w-md flex-col animate-fade-up">
-      {/* Header */}
-      <div className="card mb-4 flex items-center justify-between px-3 py-2.5">
+      {/* Top Header */}
+      <div className="card mb-3 flex items-center justify-between px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <button
             onClick={onBack}
@@ -221,13 +289,26 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
         </div>
       </div>
 
-      {/* Trạng thái */}
+      {/* Thanh công cụ: Nút Gợi ý (3 lượt) & Trạng thái */}
       <div className="mb-2 flex items-center justify-between px-1 text-xs font-semibold">
-        <span className={conflicts.size ? 'text-red-500' : 'text-slate-500'}>
-          {conflicts.size ? `⚠ Có ${conflicts.size} ô đang bị trùng` : 'Khối 2 hàng × 3 cột'}
-        </span>
+        {/* Nút 3 Lượt Gợi ý */}
+        <button
+          type="button"
+          disabled={hintsRemaining <= 0}
+          onClick={handleUseHint}
+          className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 font-bold transition shadow-sm ${
+            hintsRemaining > 0
+              ? 'bg-amber-500 text-white hover:bg-amber-600 active:scale-95 shadow-amber-500/20'
+              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+          }`}
+          title="Bấm để tự động điền 1 ô chính xác"
+        >
+          <Lightbulb className={`h-4 w-4 ${hintsRemaining > 0 ? 'text-amber-200 fill-amber-200' : ''}`} />
+          <span>Gợi ý ({hintsRemaining}/3)</span>
+        </button>
+
         <div className="flex items-center gap-3">
-          <span className={emptyCount === 0 ? 'text-green-600' : 'text-brand-600'}>
+          <span className={emptyCount === 0 ? 'text-green-600 font-bold' : 'text-brand-600'}>
             {emptyCount === 0 ? '✓ Đã điền đủ' : `Còn ${emptyCount} ô`}
           </span>
           <button onClick={handleReset} className="flex items-center gap-1 text-slate-400 hover:text-brand-600">
@@ -236,7 +317,21 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
         </div>
       </div>
 
-      {/* Bàn cờ */}
+      {/* Thông báo gợi ý nhanh */}
+      {hintMessage && (
+        <div className="mb-2 rounded-xl bg-amber-50 border border-amber-200 p-2 text-center text-xs font-bold text-amber-800 animate-fade-up">
+          💡 {hintMessage}
+        </div>
+      )}
+
+      {/* Cảnh báo trùng lặp */}
+      {conflicts.size > 0 && !hintMessage && (
+        <div className="mb-1 text-center text-xs font-bold text-red-500">
+          ⚠ Có {conflicts.size} ô đang bị trùng số trong hàng, cột hoặc khối!
+        </div>
+      )}
+
+      {/* Bàn cờ Sudoku 6x6 */}
       <div className="grid grid-cols-6 overflow-hidden rounded-2xl border-2 border-brand-700 bg-white shadow-[0_10px_30px_rgba(14,79,163,0.15)]">
         {board.map((row, r) =>
           row.map((v, c) => (
@@ -253,7 +348,7 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
       </div>
 
       {/* Bàn phím số */}
-      <div className="mt-5 grid grid-cols-4 gap-2">
+      <div className="mt-4 grid grid-cols-4 gap-2">
         {[1, 2, 3, 4, 5, 6].map((n) => {
           const full = numberCounts[n] >= 6;
           return (
@@ -282,12 +377,12 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
           onClick={() => writeCell(0)}
           className="col-span-2 flex h-14 items-center justify-center gap-2 rounded-2xl border-2 border-brand-100 bg-brand-50 text-sm font-bold text-brand-700 transition active:scale-95 active:bg-brand-100"
         >
-          <Delete className="h-5 w-5" /> Xóa
+          <Delete className="h-5 w-5" /> Xóa ô
         </button>
       </div>
 
       {/* Nộp bài */}
-      <div className="mt-auto pt-5">
+      <div className="mt-auto pt-4">
         <button
           type="button"
           disabled={isSubmitting || emptyCount > 0}

@@ -94,16 +94,18 @@ export const Screen3Result: React.FC<Screen3Props> = ({ participantInfo, result,
         )}
       </div>
 
-      {/* Mã nhận quà */}
-      <div className="card border-2 border-dashed !border-brand-300 p-5 text-center">
-        <p className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-700">
-          <Gift className="h-4 w-4" /> Mã nhận quà tại gian hàng
-        </p>
-        <p className="mt-1 select-all font-mono text-3xl font-black tracking-widest text-brand-600">
-          {participantInfo.studentId}
-        </p>
-        <p className="mt-1 text-xs text-slate-500">Đưa màn hình này cho CTV để nhận quà</p>
-      </div>
+      {/* Mã nhận quà (Chỉ hiện khi hoàn thành chính xác câu đố) */}
+      {result.isCorrect && (
+        <div className="card border-2 border-dashed !border-brand-300 p-5 text-center">
+          <p className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-700">
+            <Gift className="h-4 w-4" /> Mã nhận quà tại gian hàng
+          </p>
+          <p className="mt-1 select-all font-mono text-3xl font-black tracking-widest text-brand-600">
+            {participantInfo.studentId}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Đưa màn hình này cho CTV để nhận quà</p>
+        </div>
+      )}
 
       {/* Người vs Máy */}
       <div className="card p-5">

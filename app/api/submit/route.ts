@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { isBoardValid, matchesPuzzle, benchmarkBacktracking, INITIAL_PUZZLE } from '@/lib/sudoku';
+import { isBoardValid, matchesPuzzle, benchmarkBacktracking } from '@/lib/sudoku';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { studentId, fullName, major, startTime, board } = body;
+    const { studentId, fullName, major, startTime, board, initialPuzzle } = body;
 
     // Validate đầu vào
-    if (!studentId || !fullName || !major || !startTime || !board) {
+    if (!studentId || !fullName || !major || !startTime || !board || !initialPuzzle) {
       return NextResponse.json(
         { error: 'Vui lòng cung cấp đầy đủ thông tin!' },
         { status: 400 }
@@ -19,11 +19,13 @@ export async function POST(req: NextRequest) {
     const now = Date.now();
     const durationInSeconds = Math.max(1, Math.round((now - Number(startTime)) / 1000));
 
-    // Kiểm tra bài nộp: đúng luật Sudoku VÀ giữ nguyên các ô gợi ý của đề
-    const isCorrect = isBoardValid(board) && matchesPuzzle(board);
+    // Kiểm tra tính hợp lệ của bài nộp:
+    // 1. Phải thỏa mãn luật Sudoku 6x6
+    // 2. Phải giữ nguyên các ô gợi ý gốc của đề được giao cho thí sinh đó
+    const isCorrect = isBoardValid(board) && matchesPuzzle(board, initialPuzzle);
 
-    // Đo tốc độ giải của thuật toán Backtracking
-    const { elapsedSeconds: backtrackingTime } = benchmarkBacktracking(INITIAL_PUZZLE);
+    // Đo tốc độ giải của thuật toán Backtracking trên chính đề của thí sinh
+    const { elapsedSeconds: backtrackingTime } = benchmarkBacktracking(initialPuzzle);
 
     // Lưu / Cập nhật vào cơ sở dữ liệu qua Prisma
     const participant = await prisma.participant.upsert({
@@ -50,13 +52,11 @@ export async function POST(req: NextRequest) {
       where: { isCorrect: true },
     });
 
-    // 2. Số người giải đúng với thời gian chậm hơn hoặc bằng (để tính % percentile)
-    // Người giải càng nhanh thì percentile càng cao (vd: nhanh hơn 95% thí sinh khác)
-    let topPercentage = 10; // mặc định nếu là người đầu tiên
+    // 2. Tính Top % xếp hạng
+    let topPercentage = 10;
     let rank = 1;
 
     if (totalCorrect > 0) {
-      // Đếm số người giải nhanh hơn thí sinh này
       const fasterCount = await prisma.participant.count({
         where: {
           isCorrect: true,
@@ -64,12 +64,7 @@ export async function POST(req: NextRequest) {
         },
       });
       rank = fasterCount + 1;
-
-      // Top % xếp hạng: thí sinh nằm trong nhóm Top bao nhiêu %
-      // Ví dụ: hạng 1 / 100 người => Top 1%
-      // Ví dụ: hạng 5 / 10 người => Top 50%
-      const rawTopPercent = Math.max(1, Math.round((rank / totalCorrect) * 100));
-      topPercentage = rawTopPercent;
+      topPercentage = Math.max(1, Math.round((rank / totalCorrect) * 100));
     }
 
     // 3. Thời gian trung bình của tất cả các bài giải đúng
@@ -80,7 +75,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Nếu chưa có ai hoặc là người đầu tiên, lấy tạm thời gian của thí sinh hoặc mốc tham chiếu 90s
     const avgDuration = avgAggregate._avg.durationInSeconds
       ? Math.round(avgAggregate._avg.durationInSeconds)
       : durationInSeconds;
@@ -91,8 +85,6 @@ export async function POST(req: NextRequest) {
       isCorrect,
       durationInSeconds,
       backtrackingTime: backtrackingTime || '0.002',
-      rank,
-      totalParticipants: totalCorrect,
       topPercentage,
       averageDurationInSeconds: avgDuration,
     });
