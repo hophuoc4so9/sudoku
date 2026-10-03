@@ -2,20 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --font-geist-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-}
-
+html,
 body {
-  font-family: var(--font-geist-sans);
-  background-color: #f8fafc;
-  color: #0f172a;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: #ffffff;
+  color: #0a2f5f;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Custom styles for Sudoku cell touch interaction */
 .sudoku-cell {
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;
+}
+
+.input-field {
+  @apply w-full rounded-xl border border-brand-100 bg-brand-50/50 px-4 py-3 text-[15px] font-medium text-brand-900 placeholder:text-slate-400 transition focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-100;
+}
+
+.btn-primary {
+  @apply w-full rounded-2xl bg-brand-600 py-4 text-base font-extrabold tracking-wide text-white shadow-lg shadow-brand-600/25 transition hover:bg-brand-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none;
+}
+
+.card {
+  @apply rounded-3xl border border-brand-100 bg-white shadow-[0_8px_30px_rgba(14,79,163,0.08)];
 }

@@ -1,21 +1,69 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Timer, ArrowLeft, Send, RotateCcw, HelpCircle, CheckCircle } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Delete, RotateCcw, Send, Timer } from 'lucide-react';
 import { INITIAL_PUZZLE } from '@/lib/sudoku';
+import type { ParticipantInfo } from './Screen1Registration';
+
+type Cell = [number, number];
 
 interface Screen2Props {
-  participantInfo: {
-    fullName: string;
-    studentId: string;
-    major: string;
-    phone: string;
-  };
+  participantInfo: ParticipantInfo;
   startTime: number;
   onSubmit: (finalBoard: number[][]) => void;
   onBack: () => void;
   isSubmitting: boolean;
 }
+
+// ===== Tiền tính các nhóm: 6 hàng, 6 cột, 6 khối 2x3 =====
+const ROWS: Cell[][] = Array.from({ length: 6 }, (_, r) => Array.from({ length: 6 }, (_, c) => [r, c] as Cell));
+const COLS: Cell[][] = Array.from({ length: 6 }, (_, c) => Array.from({ length: 6 }, (_, r) => [r, c] as Cell));
+const BLOCKS: Cell[][] = [];
+for (let br = 0; br < 6; br += 2) {
+  for (let bc = 0; bc < 6; bc += 3) {
+    const cells: Cell[] = [];
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) cells.push([br + r, bc + c]);
+    BLOCKS.push(cells);
+  }
+}
+const ALL_GROUPS = [...ROWS, ...COLS, ...BLOCKS];
+
+const k = (r: number, c: number) => `${r}-${c}`;
+const blockIndex = (r: number, c: number) => Math.floor(r / 2) * 2 + Math.floor(c / 3);
+const isFixed = (r: number, c: number) => INITIAL_PUZZLE[r][c] !== 0;
+
+/** Trả về tập các ô đang bị trùng số (cùng hàng / cột / khối). */
+function findConflicts(board: number[][]): Set<string> {
+  const result = new Set<string>();
+  for (const group of ALL_GROUPS) {
+    const seen = new Map<number, Cell[]>();
+    for (const [r, c] of group) {
+      const v = board[r][c];
+      if (!v) continue;
+      seen.set(v, [...(seen.get(v) ?? []), [r, c]]);
+    }
+    seen.forEach((cells) => {
+      if (cells.length > 1) cells.forEach(([r, c]) => result.add(k(r, c)));
+    });
+  }
+  return result;
+}
+
+/** Các nhóm chứa ô (r,c) vừa được điền đầy đủ và đúng (1..6 không trùng). */
+function completedGroupsAt(board: number[][], r: number, c: number): Set<string> {
+  const groups = [ROWS[r], COLS[c], BLOCKS[blockIndex(r, c)]];
+  const result = new Set<string>();
+  for (const g of groups) {
+    const values = g.map(([gr, gc]) => board[gr][gc]);
+    if (values.every((v) => v !== 0) && new Set(values).size === 6) {
+      g.forEach(([gr, gc]) => result.add(k(gr, gc)));
+    }
+  }
+  return result;
+}
+
+const formatTime = (s: number) =>
+  `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
   participantInfo,
@@ -24,250 +72,238 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
   onBack,
   isSubmitting,
 }) => {
-  // Khởi tạo bảng từ INITIAL_PUZZLE (deep copy)
-  const [board, setBoard] = useState<number[][]>(() =>
-    INITIAL_PUZZLE.map((row) => [...row])
-  );
+  const [board, setBoard] = useState<number[][]>(() => INITIAL_PUZZLE.map((row) => [...row]));
+  const [selected, setSelected] = useState<Cell | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
+  const [flashId, setFlashId] = useState(0);
+  const [shakeCell, setShakeCell] = useState<{ key: string; id: number } | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // Vị trí ô đang được chọn: { row, col } hoặc null
-  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
-
-  // Timer đếm giây
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
-
+  // Đồng hồ đếm giây
   useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
-      setElapsedSeconds(Math.max(0, Math.floor((now - startTime) / 1000)));
-    }, 1000);
-    return () => clearInterval(interval);
+    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - startTime) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
   }, [startTime]);
 
-  // Format mm:ss
-  const formatTimer = (totalSecs: number) => {
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  useEffect(() => () => clearTimeout(flashTimer.current), []);
 
-  // Xác định ô cố định (gốc) không được sửa
-  const isFixedCell = (r: number, c: number) => {
-    return INITIAL_PUZZLE[r][c] !== 0;
-  };
+  const conflicts = useMemo(() => findConflicts(board), [board]);
+  const emptyCount = useMemo(() => board.flat().filter((v) => v === 0).length, [board]);
+  const numberCounts = useMemo(() => {
+    const counts = Array(7).fill(0);
+    board.flat().forEach((v) => counts[v]++);
+    return counts;
+  }, [board]);
 
-  // Chọn ô
-  const handleSelectCell = (r: number, c: number) => {
-    if (isFixedCell(r, c)) {
-      // Có thể vẫn highlight ô cố định để xem số trùng lặp, nhưng không sửa được
-      setSelectedCell({ row: r, col: c });
-      return;
-    }
-    setSelectedCell({ row: r, col: c });
-  };
+  const selectedValue = selected ? board[selected[0]][selected[1]] : 0;
 
-  // Điền số vào ô được chọn
-  const handleInputNumber = (num: number) => {
-    if (!selectedCell) return;
-    const { row, col } = selectedCell;
-    if (isFixedCell(row, col)) return;
+  const writeCell = useCallback(
+    (value: number) => {
+      if (!selected) return;
+      const [r, c] = selected;
+      if (isFixed(r, c) || board[r][c] === value) return;
+      // Số đã điền đủ 6 lần -> không cho điền thêm
+      if (value !== 0 && numberCounts[value] >= 6) return;
 
-    setBoard((prev) => {
-      const next = prev.map((r) => [...r]);
-      next[row][col] = num;
-      return next;
-    });
-  };
+      const next = board.map((row) => [...row]);
+      next[r][c] = value;
+      setBoard(next);
 
-  // Xóa số tại ô được chọn
-  const handleClearCell = () => {
-    if (!selectedCell) return;
-    const { row, col } = selectedCell;
-    if (isFixedCell(row, col)) return;
+      if (value === 0) return;
 
-    setBoard((prev) => {
-      const next = prev.map((r) => [...r]);
-      next[row][col] = 0;
-      return next;
-    });
-  };
-
-  // Lắng nghe bàn phím máy tính (hỗ trợ cả desktop/laptop nếu thí sinh gõ số 1-6 hoặc Backspace)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!selectedCell) return;
-      const num = parseInt(e.key, 10);
-      if (num >= 1 && num <= 6) {
-        handleInputNumber(num);
-      } else if (e.key === 'Backspace' || e.key === 'Delete') {
-        handleClearCell();
-      } else if (e.key === 'ArrowUp') {
-        setSelectedCell((prev) => prev ? { row: Math.max(0, prev.row - 1), col: prev.col } : null);
-      } else if (e.key === 'ArrowDown') {
-        setSelectedCell((prev) => prev ? { row: Math.min(5, prev.row + 1), col: prev.col } : null);
-      } else if (e.key === 'ArrowLeft') {
-        setSelectedCell((prev) => prev ? { row: prev.row, col: Math.max(0, prev.col - 1) } : null);
-      } else if (e.key === 'ArrowRight') {
-        setSelectedCell((prev) => prev ? { row: prev.row, col: Math.min(5, prev.col + 1) } : null);
+      // Điền trùng -> rung ô
+      if (findConflicts(next).has(k(r, c))) {
+        setShakeCell({ key: k(r, c), id: Date.now() });
+        return;
       }
-    };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedCell]);
-
-  // Đếm số ô còn trống
-  const emptyCellsCount = board.reduce(
-    (acc, row) => acc + row.filter((val) => val === 0).length,
-    0
+      // Hoàn thành hàng / cột / khối -> nháy xanh 1 lần
+      const done = completedGroupsAt(next, r, c);
+      if (done.size > 0) {
+        clearTimeout(flashTimer.current);
+        setFlashCells(done);
+        setFlashId((id) => id + 1);
+        flashTimer.current = setTimeout(() => setFlashCells(new Set()), 950);
+      }
+    },
+    [board, selected, numberCounts]
   );
 
-  const selectedValue =
-    selectedCell ? board[selectedCell.row][selectedCell.col] : null;
+  // Hỗ trợ bàn phím vật lý (laptop)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const n = Number(e.key);
+      if (n >= 1 && n <= 6) return writeCell(n);
+      if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') return writeCell(0);
+      const moves: Record<string, Cell> = {
+        ArrowUp: [-1, 0],
+        ArrowDown: [1, 0],
+        ArrowLeft: [0, -1],
+        ArrowRight: [0, 1],
+      };
+      const m = moves[e.key];
+      if (m) {
+        e.preventDefault();
+        setSelected((p) => {
+          const [r, c] = p ?? [0, 0];
+          return [Math.min(5, Math.max(0, r + m[0])), Math.min(5, Math.max(0, c + m[1]))];
+        });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [writeCell]);
+
+  const handleReset = () => {
+    if (confirm('Xóa toàn bộ các số đã điền và làm lại?')) {
+      setBoard(INITIAL_PUZZLE.map((row) => [...row]));
+      setSelected(null);
+    }
+  };
+
+  const getCellClass = (r: number, c: number, v: number) => {
+    const key = k(r, c);
+    const fixed = isFixed(r, c);
+    const isSel = selected?.[0] === r && selected?.[1] === c;
+    const related =
+      selected &&
+      (selected[0] === r || selected[1] === c || blockIndex(selected[0], selected[1]) === blockIndex(r, c));
+    const sameNum = v !== 0 && v === selectedValue;
+    const conflict = conflicts.has(key);
+
+    // Nền
+    let bg = fixed ? 'bg-slate-100' : 'bg-white';
+    if (related) bg = fixed ? 'bg-brand-100/70' : 'bg-brand-50';
+    if (sameNum) bg = 'bg-brand-200/80';
+    if (conflict) bg = 'bg-red-50';
+    if (isSel) bg = conflict ? 'bg-red-100' : 'bg-brand-200';
+
+    // Chữ
+    let text = fixed ? 'text-brand-900 font-black' : 'text-brand-600 font-bold';
+    if (conflict) text = 'text-red-600 font-black';
+
+    // Viền: đậm giữa các khối 2x3
+    const borderR = c === 5 ? '' : c === 2 ? 'border-r-2 border-r-brand-700' : 'border-r border-r-brand-100';
+    const borderB = r === 5 ? '' : r === 1 || r === 3 ? 'border-b-2 border-b-brand-700' : 'border-b border-b-brand-100';
+
+    const anim = flashCells.has(key) ? 'animate-flash' : shakeCell?.key === key ? 'animate-shake' : '';
+    const ring = isSel ? 'z-10 ring-2 ring-inset ring-brand-600' : '';
+
+    return `sudoku-cell relative flex aspect-square items-center justify-center text-2xl transition-colors duration-100 ${bg} ${text} ${borderR} ${borderB} ${ring} ${anim}`;
+  };
 
   return (
-    <div className="w-full max-w-md mx-auto flex flex-col min-h-[92vh] justify-between pb-4">
-      {/* Top Bar: Thí sinh + Đồng hồ bấm giờ */}
-      <div>
-        <div className="flex items-center justify-between mb-3 bg-white p-3 rounded-2xl border border-sky-100 shadow-sm">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onBack}
-              disabled={isSubmitting}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-              title="Quay lại"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-            <div>
-              <p className="text-xs font-bold text-slate-800 leading-tight">
-                {participantInfo.fullName}
-              </p>
-              <p className="text-[11px] font-medium text-sky-600">
-                MSSV: {participantInfo.studentId} • {participantInfo.major}
-              </p>
-            </div>
-          </div>
-
-          {/* Timer đếm giây chạy liên tục */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-800">
-            <Timer className="w-4 h-4 text-sky-600 animate-pulse" />
-            <span className="font-mono font-black text-sm tracking-wider">
-              {formatTimer(elapsedSeconds)}
-            </span>
+    <div className="mx-auto flex min-h-[calc(100dvh-2rem)] w-full max-w-md flex-col animate-fade-up">
+      {/* Header */}
+      <div className="card mb-4 flex items-center justify-between px-3 py-2.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            onClick={onBack}
+            disabled={isSubmitting}
+            className="rounded-xl p-2 text-brand-700 transition hover:bg-brand-50"
+            aria-label="Quay lại"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-brand-900">{participantInfo.fullName}</p>
+            <p className="text-[11px] font-medium text-slate-500">
+              {participantInfo.studentId} · {participantInfo.major}
+            </p>
           </div>
         </div>
-
-        {/* Luật chơi & Gợi ý khối 2x3 */}
-        <div className="flex items-center justify-between px-1 mb-2 text-[11px] font-medium text-slate-500">
-          <span className="flex items-center gap-1">
-            <HelpCircle className="w-3 h-3 text-sky-500" />
-            Khối 2 hàng x 3 cột (2x3)
-          </span>
-          <span className={emptyCellsCount === 0 ? 'text-emerald-600 font-bold' : 'text-slate-500'}>
-            Còn {emptyCellsCount} ô trống
-          </span>
-        </div>
-
-        {/* BÀN CỜ SUDOKU 6x6 */}
-        {/* Khối chia: 6 khối gồm 2 hàng x 3 cột (2x3).
-            - Phân cách cột: cột 2|3 có viền đậm (border-r-4)
-            - Phân cách hàng: hàng 1|2 và hàng 3|4 có viền đậm (border-b-4)
-        */}
-        <div className="bg-sky-900 p-2 sm:p-2.5 rounded-3xl shadow-xl shadow-sky-900/15 border-2 border-sky-700">
-          <div className="grid grid-cols-6 gap-0 bg-sky-950/20 rounded-2xl overflow-hidden border-2 border-slate-700">
-            {board.map((row, r) =>
-              row.map((val, c) => {
-                const isFixed = isFixedCell(r, c);
-                const isSelected = selectedCell?.row === r && selectedCell?.col === c;
-                const isSameRowOrCol =
-                  selectedCell && (selectedCell.row === r || selectedCell.col === c);
-                const isSameNumber =
-                  selectedValue && selectedValue !== 0 && val === selectedValue;
-
-                // Khối 2x3: 
-                // Cột ngăn cách khối là c === 2 (giữa cột 2 và cột 3)
-                const isBlockRightBorder = c === 2;
-                // Hàng ngăn cách khối là r === 1 và r === 3 (giữa hàng 1 & 2, và hàng 3 & 4)
-                const isBlockBottomBorder = r === 1 || r === 3;
-
-                return (
-                  <button
-                    key={`${r}-${c}`}
-                    type="button"
-                    onClick={() => handleSelectCell(r, c)}
-                    className={`
-                      sudoku-cell aspect-square flex items-center justify-center font-bold text-lg sm:text-xl
-                      border border-slate-300 transition-all duration-75 relative select-none
-                      ${isBlockRightBorder ? 'border-r-[3px] border-r-slate-800' : ''}
-                      ${isBlockBottomBorder ? 'border-b-[3px] border-b-slate-800' : ''}
-                      ${
-                        isSelected
-                          ? '!bg-sky-500 !text-white z-20 shadow-inner scale-[0.98] ring-2 ring-sky-300'
-                          : isFixed
-                          ? 'bg-slate-200/95 text-slate-800 font-black'
-                          : val !== 0
-                          ? 'bg-white text-sky-700 font-extrabold'
-                          : 'bg-white/95 text-slate-300 hover:bg-sky-50'
-                      }
-                      ${!isSelected && isSameNumber ? '!bg-amber-100 !text-amber-900' : ''}
-                      ${!isSelected && !isSameNumber && isSameRowOrCol ? '!bg-sky-50/70' : ''}
-                    `}
-                  >
-                    {val !== 0 ? val : ''}
-                  </button>
-                );
-              })
-            )}
-          </div>
+        <div className="flex items-center gap-1.5 rounded-xl bg-brand-600 px-3 py-2 text-white shadow-md shadow-brand-600/25">
+          <Timer className="h-4 w-4" />
+          <span className="font-mono text-base font-black tabular-nums">{formatTime(elapsed)}</span>
         </div>
       </div>
 
-      {/* BÀN PHÍM SỐ ẢO MOBILE-FIRST & NÚT NỘP BÀI */}
-      <div className="mt-4 space-y-3">
-        {/* Nút bấm số 1 - 6 và Xóa: Nút to, vừa tầm ngón tay cái */}
-        <div className="grid grid-cols-7 gap-1.5 sm:gap-2 bg-white p-2 sm:p-2.5 rounded-2xl border border-sky-100 shadow-md">
-          {[1, 2, 3, 4, 5, 6].map((num) => (
-            <button
-              key={num}
-              type="button"
-              onClick={() => handleInputNumber(num)}
-              className="h-13 sm:h-14 rounded-xl bg-slate-50 hover:bg-sky-100 active:bg-sky-600 active:text-white border border-slate-200 hover:border-sky-300 text-sky-950 font-black text-xl transition flex items-center justify-center shadow-sm select-none"
-            >
-              {num}
-            </button>
-          ))}
-          {/* Nút Xóa */}
-          <button
-            type="button"
-            onClick={handleClearCell}
-            className="h-13 sm:h-14 rounded-xl bg-rose-50 hover:bg-rose-100 active:bg-rose-500 active:text-white border border-rose-200 text-rose-600 font-bold text-xs sm:text-sm transition flex flex-col items-center justify-center shadow-sm select-none"
-            title="Xóa ô"
-          >
-            <span className="text-base leading-none">⌫</span>
-            <span className="text-[10px] mt-0.5">Xóa</span>
+      {/* Trạng thái */}
+      <div className="mb-2 flex items-center justify-between px-1 text-xs font-semibold">
+        <span className={conflicts.size ? 'text-red-500' : 'text-slate-500'}>
+          {conflicts.size ? `⚠ Có ${conflicts.size} ô đang bị trùng` : 'Khối 2 hàng × 3 cột'}
+        </span>
+        <div className="flex items-center gap-3">
+          <span className={emptyCount === 0 ? 'text-green-600' : 'text-brand-600'}>
+            {emptyCount === 0 ? '✓ Đã điền đủ' : `Còn ${emptyCount} ô`}
+          </span>
+          <button onClick={handleReset} className="flex items-center gap-1 text-slate-400 hover:text-brand-600">
+            <RotateCcw className="h-3.5 w-3.5" /> Làm lại
           </button>
         </div>
+      </div>
 
-        {/* Nút Nộp Bài To Bự Ở Cuối Màn Hình */}
+      {/* Bàn cờ */}
+      <div className="grid grid-cols-6 overflow-hidden rounded-2xl border-2 border-brand-700 bg-white shadow-[0_10px_30px_rgba(14,79,163,0.15)]">
+        {board.map((row, r) =>
+          row.map((v, c) => (
+            <button
+              key={`${k(r, c)}-${flashCells.has(k(r, c)) ? flashId : 0}-${shakeCell?.key === k(r, c) ? shakeCell.id : 0}`}
+              type="button"
+              onClick={() => setSelected([r, c])}
+              className={getCellClass(r, c, v)}
+            >
+              {v !== 0 && <span className={isFixed(r, c) ? '' : 'animate-pop'}>{v}</span>}
+            </button>
+          ))
+        )}
+      </div>
+
+      {/* Bàn phím số */}
+      <div className="mt-5 grid grid-cols-4 gap-2">
+        {[1, 2, 3, 4, 5, 6].map((n) => {
+          const full = numberCounts[n] >= 6;
+          return (
+            <button
+              key={n}
+              type="button"
+              disabled={full}
+              onClick={() => writeCell(n)}
+              className={`relative h-14 rounded-2xl border-2 text-2xl font-black transition ${
+                full
+                  ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300 line-through'
+                  : 'border-brand-100 bg-white text-brand-700 shadow-sm hover:border-brand-300 active:scale-95 active:bg-brand-600 active:text-white'
+              }`}
+            >
+              {n}
+              {!full && (
+                <span className="absolute right-1.5 top-1 text-[9px] font-bold text-brand-300">
+                  {6 - numberCounts[n]}
+                </span>
+              )}
+            </button>
+          );
+        })}
         <button
           type="button"
-          disabled={isSubmitting}
+          onClick={() => writeCell(0)}
+          className="col-span-2 flex h-14 items-center justify-center gap-2 rounded-2xl border-2 border-brand-100 bg-brand-50 text-sm font-bold text-brand-700 transition active:scale-95 active:bg-brand-100"
+        >
+          <Delete className="h-5 w-5" /> Xóa
+        </button>
+      </div>
+
+      {/* Nộp bài */}
+      <div className="mt-auto pt-5">
+        <button
+          type="button"
+          disabled={isSubmitting || emptyCount > 0}
           onClick={() => onSubmit(board)}
-          className={`w-full py-4 px-6 rounded-2xl font-black text-base shadow-lg transition transform active:scale-[0.98] flex items-center justify-center gap-2 ${
-            emptyCellsCount === 0
-              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-500/25 ring-2 ring-emerald-300'
-              : 'bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white shadow-sky-500/30'
-          } ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+          className="btn-primary flex items-center justify-center gap-2"
         >
           {isSubmitting ? (
-            <span className="flex items-center gap-2">
-              <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Đang chấm bài & ghi nhận...
-            </span>
+            <>
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Đang chấm bài...
+            </>
+          ) : emptyCount > 0 ? (
+            `Điền nốt ${emptyCount} ô để nộp bài`
           ) : (
             <>
-              <span>NỘP BÀI THỬ THÁCH</span>
-              <Send className="w-5 h-5" />
+              NỘP BÀI <Send className="h-5 w-5" />
             </>
           )}
         </button>

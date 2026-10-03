@@ -5,9 +5,8 @@
  * Mỗi hàng, mỗi cột và mỗi khối 2x3 phải chứa các số từ 1 đến 6 không trùng lặp.
  */
 
-// Bảng Sudoku 6x6 mẫu dành cho tân sinh viên (độ khó vừa phải, thân thiện nhưng cần suy luận logic)
-// 0 đại diện cho ô trống
-export const INITIAL_PUZZLE: number[][] = [
+// Đề mặc định dành cho tân sinh viên (0 = ô trống)
+export const DEFAULT_PUZZLE: number[][] = [
   [0, 0, 3, 0, 1, 0],
   [5, 6, 0, 3, 2, 0],
   [0, 5, 4, 2, 0, 3],
@@ -15,6 +14,54 @@ export const INITIAL_PUZZLE: number[][] = [
   [0, 1, 2, 0, 4, 5],
   [0, 4, 0, 1, 0, 0],
 ];
+
+/**
+ * Đọc đề từ chuỗi 36 ký tự (đọc từ trái sang phải, từ trên xuống dưới, 0 = ô trống).
+ * Có thể chứa dấu cách / dấu phẩy / gạch dưới để dễ đọc, ví dụ:
+ *   "003010,560320,054203,206450,012045,040100"
+ * Trả về null nếu sai định dạng, có số trùng hoặc không có lời giải.
+ */
+export function parsePuzzle(raw?: string | null): number[][] | null {
+  if (!raw) return null;
+  const digits = raw.replace(/[^0-9]/g, '');
+  if (!/^[0-6]{36}$/.test(digits)) return null;
+
+  const board = Array.from({ length: 6 }, (_, r) =>
+    Array.from({ length: 6 }, (_, c) => Number(digits[r * 6 + c]))
+  );
+
+  // Các ô gợi ý không được trùng nhau
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 6; c++) {
+      const v = board[r][c];
+      if (!v) continue;
+      board[r][c] = 0;
+      const ok = isValidPlacement(board, r, c, v);
+      board[r][c] = v;
+      if (!ok) return null;
+    }
+  }
+
+  return solveSudoku6x6(board) ? board : null;
+}
+
+/**
+ * Đề đang dùng: lấy từ ENV `NEXT_PUBLIC_SUDOKU_PUZZLE`, nếu không có hoặc không hợp lệ thì dùng đề mặc định.
+ * (Biến NEXT_PUBLIC_ được Next.js nhúng vào lúc build -> client và server dùng chung 1 đề.)
+ */
+export const INITIAL_PUZZLE: number[][] = (() => {
+  const raw = process.env.NEXT_PUBLIC_SUDOKU_PUZZLE;
+  const parsed = parsePuzzle(raw);
+  if (raw && !parsed) {
+    console.warn('[sudoku] NEXT_PUBLIC_SUDOKU_PUZZLE không hợp lệ -> dùng đề mặc định.');
+  }
+  return parsed ?? DEFAULT_PUZZLE;
+})();
+
+/** Bài nộp phải giữ nguyên các ô gợi ý của đề. */
+export function matchesPuzzle(board: number[][], puzzle: number[][] = INITIAL_PUZZLE): boolean {
+  return puzzle.every((row, r) => row.every((v, c) => v === 0 || board?.[r]?.[c] === v));
+}
 
 /**
  * Kiểm tra xem đặt `num` vào vị trí (row, col) có hợp lệ không (theo hàng, cột và khối 2x3).

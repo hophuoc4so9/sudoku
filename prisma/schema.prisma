@@ -12,7 +12,7 @@ model Participant {
   studentId         String   @unique
   fullName          String
   major             String   // CNTT, KTPM, TTNT
-  phone             String
+  phone             String?  // Không bắt buộc (đã bỏ khỏi form)
   durationInSeconds Int
   isCorrect         Boolean  @default(false)
   isGiftClaimed     Boolean  @default(false)
