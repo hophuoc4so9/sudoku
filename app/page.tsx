@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Screen1Registration, type ParticipantInfo } from '@/components/Screen1Registration';
+import { SharedRegistrationForm, type ParticipantInfo } from '@/components/Screen1Registration';
 import { Screen2SudokuBoard } from '@/components/Screen2SudokuBoard';
 import { Screen3Result } from '@/components/Screen3Result';
+import { CodeSprintGame } from '@/components/CodeSprintGame';
 import { generateRandomSudoku6x6 } from '@/lib/sudoku';
 
-type ScreenState = 'screen1' | 'screen2' | 'screen3';
+type ScreenState = 'screen1' | 'sudoku_playing' | 'sudoku_result' | 'code_sprint_playing';
 
 interface ResultData {
   isCorrect: boolean;
@@ -16,28 +17,42 @@ interface ResultData {
   averageDurationInSeconds?: number;
 }
 
-export default function SudokuGamePage() {
+export default function UnifiedGamePage() {
   const [screen, setScreen] = useState<ScreenState>('screen1');
-  const [info, setInfo] = useState<ParticipantInfo>({ fullName: '', studentId: '', major: 'CNTT' });
+  const [info, setInfo] = useState<ParticipantInfo>({
+    fullName: '',
+    studentId: '',
+    major: 'CNTT',
+    selectedGame: 'SUDOKU',
+  });
+
   const [startTime, setStartTime] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<ResultData | null>(null);
 
-  // Bộ đề ngẫu nhiên riêng biệt cho từng người
+  // Bộ đề ngẫu nhiên riêng biệt cho Sudoku
   const [currentPuzzle, setCurrentPuzzle] = useState<number[][]>([]);
   const [currentSolution, setCurrentSolution] = useState<number[][]>([]);
 
+  // Bắt đầu chơi: Kiểm tra môn thi đã chọn
   const handleStart = (data: ParticipantInfo) => {
     setInfo(data);
-    // TẠO ĐỀ NGẪU NHIÊN RIÊNG BIỆT CHO THÍ SINH NÀY (có nghiệm duy nhất và solution đi kèm)
-    const { puzzle, solution } = generateRandomSudoku6x6(18);
-    setCurrentPuzzle(puzzle);
-    setCurrentSolution(solution);
     setStartTime(Date.now());
-    setScreen('screen2');
+
+    if (data.selectedGame === 'CODE_SPRINT') {
+      // Chuyển sang màn hình chơi Code Sprint C++ TRÊN CÙNG 1 TRANG
+      setScreen('code_sprint_playing');
+    } else {
+      // Chuyển sang màn hình chơi Sudoku 6x6
+      const { puzzle, solution } = generateRandomSudoku6x6(18);
+      setCurrentPuzzle(puzzle);
+      setCurrentSolution(solution);
+      setScreen('sudoku_playing');
+    }
   };
 
-  const handleSubmit = async (board: number[][]) => {
+  // Nộp bài Sudoku
+  const handleSudokuSubmit = async (board: number[][]) => {
     setIsSubmitting(true);
     try {
       const res = await fetch('/api/submit', {
@@ -48,6 +63,7 @@ export default function SudokuGamePage() {
           startTime,
           board,
           initialPuzzle: currentPuzzle,
+          gameType: 'SUDOKU',
         }),
       });
       const data = await res.json();
@@ -62,7 +78,7 @@ export default function SudokuGamePage() {
         topPercentage: data.topPercentage,
         averageDurationInSeconds: data.averageDurationInSeconds,
       });
-      setScreen('screen3');
+      setScreen('sudoku_result');
       window.scrollTo({ top: 0 });
     } catch {
       alert('Không thể kết nối máy chủ. Vui lòng thử lại!');
@@ -71,31 +87,56 @@ export default function SudokuGamePage() {
     }
   };
 
-  const handlePlayAgain = () => {
-    // Khi chơi lại, tạo luôn 1 đề ngẫu nhiên mới hoàn toàn
+  const handleSudokuPlayAgain = () => {
     const { puzzle, solution } = generateRandomSudoku6x6(18);
     setCurrentPuzzle(puzzle);
     setCurrentSolution(solution);
     setStartTime(Date.now());
-    setScreen('screen2');
+    setScreen('sudoku_playing');
+  };
+
+  const handleCodeSprintPlayAgain = () => {
+    setStartTime(Date.now());
+    setScreen('code_sprint_playing');
   };
 
   return (
     <main className="min-h-[100dvh] bg-gradient-to-b from-brand-50 via-white to-white px-4 py-4 sm:py-8">
-      {screen === 'screen1' && <Screen1Registration onStart={handleStart} />}
-      {screen === 'screen2' && currentPuzzle.length > 0 && (
+      {/* 1. MÀN HÌNH CHỌN MÔN & ĐĂNG NHẬP THÔNG TIN (DUY NHẤT 1 GIAO DIỆN) */}
+      {screen === 'screen1' && (
+        <SharedRegistrationForm onStart={handleStart} initialGame={info.selectedGame} />
+      )}
+
+      {/* 2. MÔN SUDOKU 6X6: ĐANG CHƠI */}
+      {screen === 'sudoku_playing' && currentPuzzle.length > 0 && (
         <Screen2SudokuBoard
           participantInfo={info}
           initialPuzzle={currentPuzzle}
           solution={currentSolution}
           startTime={startTime}
-          onSubmit={handleSubmit}
+          onSubmit={handleSudokuSubmit}
           onBack={() => setScreen('screen1')}
           isSubmitting={isSubmitting}
         />
       )}
-      {screen === 'screen3' && result && (
-        <Screen3Result participantInfo={info} result={result} onPlayAgain={handlePlayAgain} />
+
+      {/* 3. MÔN SUDOKU 6X6: KẾT QUẢ & MÃ QUÀ */}
+      {screen === 'sudoku_result' && result && (
+        <Screen3Result
+          participantInfo={info}
+          result={result}
+          onPlayAgain={handleSudokuPlayAgain}
+        />
+      )}
+
+      {/* 4. MÔN CODE SPRINT C++: ĐANG CHƠI & KẾT QUẢ */}
+      {screen === 'code_sprint_playing' && (
+        <CodeSprintGame
+          participantInfo={info}
+          startTime={startTime}
+          onBack={() => setScreen('screen1')}
+          onPlayAgain={handleCodeSprintPlayAgain}
+        />
       )}
     </main>
   );

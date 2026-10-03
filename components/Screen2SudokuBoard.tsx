@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Delete, RotateCcw, Send, Timer, Lightbulb, Sparkles } from 'lucide-react';
+import { SUDOKU_MAX_HINTS } from '@/lib/config';
 import type { ParticipantInfo } from './Screen1Registration';
 
 type Cell = [number, number];
@@ -83,8 +84,9 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
   const [shakeCell, setShakeCell] = useState<{ key: string; id: number } | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // Số lượt gợi ý còn lại (tối đa 3 lượt)
-  const [hintsRemaining, setHintsRemaining] = useState<number>(3);
+  // Số lượt gợi ý còn lại (mặc định cấu hình local, chuẩn 9 lượt)
+  const maxHints = SUDOKU_MAX_HINTS;
+  const [hintsRemaining, setHintsRemaining] = useState<number>(maxHints);
   // Gợi ý tin nhắn nhỏ thông báo cho thí sinh
   const [hintMessage, setHintMessage] = useState<string | null>(null);
 
@@ -146,43 +148,73 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
     [board, selected, numberCounts, isFixed]
   );
 
-  // XỬ LÝ 3 LƯỢT GỢI Ý (HINT)
+  // XỬ LÝ LƯỢT GỢI Ý (HINT) THEO THỨ TỰ ƯU TIÊN 3 BƯỚC:
+  // 1. Ô ĐIỀN SAI SỐ: Nếu có ô nào người chơi đã điền nhưng bị SAI đáp án -> ƯU TIÊN SỐ 1 để sửa ngay!
+  // 2. Ô ĐANG ĐƯỢC CHỌN (selected): Nếu ô đang chọn chưa đúng (ô trống) -> CẬP NHẬT Ô HIỆN TẠI NÀY!
+  // 3. MẤY Ô KHÁC: Nếu không có ô sai và ô đang chọn đã đúng (hoặc không chọn ô nào) -> GỢI Ý 1 Ô TRỐNG BẤT KỲ!
   const handleUseHint = () => {
     if (hintsRemaining <= 0) return;
 
     let targetR = -1;
     let targetC = -1;
+    let hintReason = '';
 
-    // 1. Ưu tiên: nếu người dùng đang chọn 1 ô (không phải ô gốc và chưa điền đúng)
-    if (selected) {
+    // BƯỚC 1: Tìm tất cả các ô người chơi ĐÃ ĐIỀN (board[r][c] !== 0) nhưng ĐIỀN SAI (board[r][c] !== solution[r][c])
+    const wrongFilledCells: Cell[] = [];
+    for (let r = 0; r < 6; r++) {
+      for (let c = 0; c < 6; c++) {
+        if (!isFixed(r, c) && board[r][c] !== 0 && board[r][c] !== solution[r][c]) {
+          wrongFilledCells.push([r, c]);
+        }
+      }
+    }
+
+    if (wrongFilledCells.length > 0) {
+      // Nếu ô đang chọn nằm trong danh sách ô sai -> ưu tiên sửa ngay ô đang chọn
+      if (selected && wrongFilledCells.some(([wr, wc]) => wr === selected[0] && wc === selected[1])) {
+        targetR = selected[0];
+        targetC = selected[1];
+      } else {
+        // Ngược lại, lấy ô sai đầu tiên (hoặc ngẫu nhiên ô sai)
+        const chosenWrong = wrongFilledCells[0];
+        targetR = chosenWrong[0];
+        targetC = chosenWrong[1];
+      }
+      hintReason = 'Sửa ô bị điền sai';
+    }
+
+    // BƯỚC 2: Nếu không có ô nào bị điền sai -> xét Ô ĐANG ĐƯỢC CHỌN HIỆN TẠI (nếu có và chưa điền đúng)
+    if (targetR === -1 && selected) {
       const [sr, sc] = selected;
       if (!isFixed(sr, sc) && board[sr][sc] !== solution[sr][sc]) {
         targetR = sr;
         targetC = sc;
+        hintReason = 'Điền vào ô đang chọn';
       }
     }
 
-    // 2. Nếu không chọn ô nào hoặc ô đang chọn đã đúng -> tìm các ô trống / ô điền sai để gợi ý ngẫu nhiên
+    // BƯỚC 3: Mấy ô khác -> Tìm các ô trống còn lại trên bảng
     if (targetR === -1) {
-      const candidateCells: Cell[] = [];
+      const emptyCells: Cell[] = [];
       for (let r = 0; r < 6; r++) {
         for (let c = 0; c < 6; c++) {
-          if (!isFixed(r, c) && board[r][c] !== solution[r][c]) {
-            candidateCells.push([r, c]);
+          if (!isFixed(r, c) && board[r][c] === 0) {
+            emptyCells.push([r, c]);
           }
         }
       }
 
-      if (candidateCells.length === 0) {
-        setHintMessage('Tất cả các ô hiện tại đều đã chính xác!');
+      if (emptyCells.length === 0) {
+        setHintMessage('Tất cả các ô trên bàn cờ đều đã chính xác!');
         setTimeout(() => setHintMessage(null), 2500);
         return;
       }
 
-      // Chọn ngẫu nhiên 1 ô trong số các ô chưa đúng
-      const randomCell = candidateCells[Math.floor(Math.random() * candidateCells.length)];
-      targetR = randomCell[0];
-      targetC = randomCell[1];
+      // Chọn ngẫu nhiên 1 ô trống
+      const randomEmpty = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+      targetR = randomEmpty[0];
+      targetC = randomEmpty[1];
+      hintReason = 'Gợi ý ô tiếp theo';
     }
 
     const correctNumber = solution[targetR][targetC];
@@ -199,7 +231,7 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
     setFlashId((id) => id + 1);
     flashTimer.current = setTimeout(() => setFlashCells(new Set()), 1200);
 
-    setHintMessage(`Đã điền số ${correctNumber} vào hàng ${targetR + 1}, cột ${targetC + 1}!`);
+    setHintMessage(`[${hintReason}] Đã điền số ${correctNumber} vào hàng ${targetR + 1}, cột ${targetC + 1}!`);
     setTimeout(() => setHintMessage(null), 3000);
   };
 
@@ -291,7 +323,7 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
 
       {/* Thanh công cụ: Nút Gợi ý (3 lượt) & Trạng thái */}
       <div className="mb-2 flex items-center justify-between px-1 text-xs font-semibold">
-        {/* Nút 3 Lượt Gợi ý */}
+        {/* Nút Lượt Gợi ý (mặc định 9) */}
         <button
           type="button"
           disabled={hintsRemaining <= 0}
@@ -304,7 +336,7 @@ export const Screen2SudokuBoard: React.FC<Screen2Props> = ({
           title="Bấm để tự động điền 1 ô chính xác"
         >
           <Lightbulb className={`h-4 w-4 ${hintsRemaining > 0 ? 'text-amber-200 fill-amber-200' : ''}`} />
-          <span>Gợi ý ({hintsRemaining}/3)</span>
+          <span>Gợi ý ({hintsRemaining}/{maxHints})</span>
         </button>
 
         <div className="flex items-center gap-3">

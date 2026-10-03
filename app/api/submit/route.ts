@@ -27,12 +27,15 @@ export async function POST(req: NextRequest) {
     // Đo tốc độ giải của thuật toán Backtracking trên chính đề của thí sinh
     const { elapsedSeconds: backtrackingTime } = benchmarkBacktracking(initialPuzzle);
 
+    const gameType = body.gameType || 'SUDOKU';
+
     // Lưu / Cập nhật vào cơ sở dữ liệu qua Prisma
     const participant = await prisma.participant.upsert({
       where: { studentId: studentId.trim().toUpperCase() },
       update: {
         fullName: fullName.trim(),
         major: major.trim(),
+        gameType,
         durationInSeconds,
         isCorrect,
       },
@@ -40,16 +43,17 @@ export async function POST(req: NextRequest) {
         studentId: studentId.trim().toUpperCase(),
         fullName: fullName.trim(),
         major: major.trim(),
+        gameType,
         durationInSeconds,
         isCorrect,
         isGiftClaimed: false,
       },
     });
 
-    // TÍNH TOÁN THỐNG KÊ REAL-TIME TẠI THỜI ĐIỂM HOÀN THÀNH:
-    // 1. Tổng số người đã giải đúng
+    // TÍNH TOÁN THỐNG KÊ REAL-TIME TẠI THỜI ĐIỂM HOÀN THÀNH (theo gameType):
+    // 1. Tổng số người đã giải đúng môn này
     const totalCorrect = await prisma.participant.count({
-      where: { isCorrect: true },
+      where: { gameType, isCorrect: true },
     });
 
     // 2. Tính Top % xếp hạng
@@ -59,6 +63,7 @@ export async function POST(req: NextRequest) {
     if (totalCorrect > 0) {
       const fasterCount = await prisma.participant.count({
         where: {
+          gameType,
           isCorrect: true,
           durationInSeconds: { lt: durationInSeconds },
         },
@@ -67,9 +72,9 @@ export async function POST(req: NextRequest) {
       topPercentage = Math.max(1, Math.round((rank / totalCorrect) * 100));
     }
 
-    // 3. Thời gian trung bình của tất cả các bài giải đúng
+    // 3. Thời gian trung bình của tất cả các bài giải đúng môn này
     const avgAggregate = await prisma.participant.aggregate({
-      where: { isCorrect: true },
+      where: { gameType, isCorrect: true },
       _avg: {
         durationInSeconds: true,
       },
