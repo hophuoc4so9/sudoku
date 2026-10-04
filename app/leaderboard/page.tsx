@@ -8,6 +8,7 @@ interface Row {
   id: string;
   studentId: string;
   fullName: string;
+  phone?: string | null;
   major: string;
   gameType: string;
   durationInSeconds: number;
@@ -65,7 +66,7 @@ export default function LeaderboardPage() {
   };
 
   const filtered = rows.filter((r) =>
-    `${r.fullName} ${r.studentId} ${r.major}`.toLowerCase().includes(q.toLowerCase())
+    `${r.fullName} ${r.studentId} ${r.phone || ''} ${r.major}`.toLowerCase().includes(q.toLowerCase())
   );
   const podium = filtered.slice(0, 3);
 
@@ -220,7 +221,15 @@ export default function LeaderboardPage() {
                         </td>
                         <td className="px-4 py-3">
                           <p className="font-bold text-brand-900">{r.fullName}</p>
-                          <p className="font-mono text-xs text-slate-500">{r.studentId}</p>
+                          <div className="flex items-center gap-2 font-mono text-xs text-slate-500">
+                            <span>{r.studentId}</span>
+                            {r.phone && (
+                              <>
+                                <span className="text-slate-300">•</span>
+                                <span className="font-medium text-brand-600">{r.phone}</span>
+                              </>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <span

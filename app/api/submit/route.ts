@@ -5,7 +5,7 @@ import { isBoardValid, matchesPuzzle, benchmarkBacktracking } from '@/lib/sudoku
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { studentId, fullName, major, startTime, board, initialPuzzle } = body;
+    const { studentId, fullName, phone, major, startTime, board, initialPuzzle } = body;
 
     // Validate đầu vào
     if (!studentId || !fullName || !major || !startTime || !board || !initialPuzzle) {
@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
       where: { studentId: studentId.trim().toUpperCase() },
       update: {
         fullName: fullName.trim(),
+        phone: phone ? String(phone).trim() : null,
         major: major.trim(),
         gameType,
         durationInSeconds,
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
       create: {
         studentId: studentId.trim().toUpperCase(),
         fullName: fullName.trim(),
+        phone: phone ? String(phone).trim() : null,
         major: major.trim(),
         gameType,
         durationInSeconds,

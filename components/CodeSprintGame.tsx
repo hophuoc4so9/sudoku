@@ -139,6 +139,7 @@ export const CodeSprintGame: React.FC<CodeSprintGameProps> = ({
           body: JSON.stringify({
             studentId: participantInfo.studentId,
             fullName: participantInfo.fullName,
+            phone: participantInfo.phone,
             major: participantInfo.major,
             durationInSeconds: elapsedSeconds,
             score: finalScore,

@@ -22,6 +22,7 @@ export default function UnifiedGamePage() {
   const [info, setInfo] = useState<ParticipantInfo>({
     fullName: '',
     studentId: '',
+    phone: '',
     major: 'CNTT',
     selectedGame: 'SUDOKU',
   });

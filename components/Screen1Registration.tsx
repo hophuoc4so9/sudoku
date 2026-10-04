@@ -6,6 +6,7 @@ import { ArrowRight, Grid, Code2 } from 'lucide-react';
 export interface ParticipantInfo {
   fullName: string;
   studentId: string;
+  phone: string;
   major: string;
   selectedGame: 'SUDOKU' | 'CODE_SPRINT';
 }
@@ -28,6 +29,7 @@ export const SharedRegistrationForm: React.FC<Screen1Props> = ({
 }) => {
   const [fullName, setFullName] = useState('');
   const [studentId, setStudentId] = useState('');
+  const [phone, setPhone] = useState('');
   const [major, setMajor] = useState('CNTT');
   const [selectedGame, setSelectedGame] = useState<'SUDOKU' | 'CODE_SPRINT'>(initialGame);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -37,12 +39,18 @@ export const SharedRegistrationForm: React.FC<Screen1Props> = ({
     const next: Record<string, string> = {};
     if (!fullName.trim()) next.fullName = 'Vui lòng nhập họ và tên';
     if (!studentId.trim()) next.studentId = 'Vui lòng nhập mã số sinh viên';
+    if (!phone.trim()) {
+      next.phone = 'Vui lòng nhập số điện thoại';
+    } else if (!/^[0-9]{9,11}$/.test(phone.trim().replace(/\s+/g, ''))) {
+      next.phone = 'Số điện thoại không hợp lệ (9 - 11 chữ số)';
+    }
     setErrors(next);
     if (Object.keys(next).length) return;
 
     onStart({
       fullName: fullName.trim(),
       studentId: studentId.trim().toUpperCase(),
+      phone: phone.trim().replace(/\s+/g, ''),
       major,
       selectedGame,
     });
@@ -155,6 +163,20 @@ export const SharedRegistrationForm: React.FC<Screen1Props> = ({
             className={`input-field font-mono uppercase tracking-wider ${errors.studentId ? '!border-red-400 !ring-red-100' : ''}`}
           />
           {errors.studentId && <p className="mt-1 text-xs font-medium text-red-500">{errors.studentId}</p>}
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-brand-900">
+            Số điện thoại <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="tel"
+            placeholder="VD: 0912345678"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className={`input-field font-mono ${errors.phone ? '!border-red-400 !ring-red-100' : ''}`}
+          />
+          {errors.phone && <p className="mt-1 text-xs font-medium text-red-500">{errors.phone}</p>}
         </div>
 
         {/* CHUYÊN NGÀNH: CNTT, KTPM, TTNT, VÀ NGÀNH KHÁC */}

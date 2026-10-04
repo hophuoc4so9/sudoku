@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { studentId, fullName, major, durationInSeconds, score, totalQuestions } = body;
+    const { studentId, fullName, phone, major, durationInSeconds, score, totalQuestions } = body;
 
     if (!studentId || !fullName || !major) {
       return NextResponse.json(
@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
       where: { studentId: studentId.trim().toUpperCase() },
       update: {
         fullName: fullName.trim(),
+        phone: phone ? String(phone).trim() : null,
         major: major.trim(),
         gameType: 'CODE_SPRINT',
         durationInSeconds: duration,
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
       create: {
         studentId: studentId.trim().toUpperCase(),
         fullName: fullName.trim(),
+        phone: phone ? String(phone).trim() : null,
         major: major.trim(),
         gameType: 'CODE_SPRINT',
         durationInSeconds: duration,
