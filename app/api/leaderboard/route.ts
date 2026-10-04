@@ -28,7 +28,6 @@ export async function GET(req: NextRequest) {
         id: true,
         studentId: true,
         fullName: true,
-        phone: true,
         major: true,
         gameType: true,
         durationInSeconds: true,
